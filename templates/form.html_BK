@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>日報入力フォーム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-4xl mx-auto bg-white p-6 rounded shadow">
+        <h1 class="text-3xl font-bold mb-6 flex items-center">
+            <img src="https://em-content.zobj.net/source/apple/354/memo_1f4dd.png" alt="memo" class="w-8 h-8 mr-2">日報入力フォーム
+        </h1>
+
+        <form method="POST" action="/">
+            <label class="block mb-2">日付</label>
+            <input type="date" name="report_date" required class="w-full p-2 border rounded mb-4">
+
+            <label class="block mb-2">氏名</label>
+            <select name="name" required class="w-full p-2 border rounded mb-4">
+                {% for name in names %}
+                    <option value="{{ name }}">{{ name }}</option>
+                {% endfor %}
+            </select>
+
+            <div id="rows-container">
+                <div class="row flex space-x-2 mb-4">
+                    <div class="flex-1">
+                        <label class="block mb-1">項目</label>
+                        <select name="category[]" class="category-select w-full p-2 border rounded" required>
+                            {% for cat in categories %}
+                                <option value="{{ cat }}">{{ cat }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="flex-1">
+                        <label class="block mb-1">詳細</label>
+                        <select name="detail[]" class="detail-select w-full p-2 border rounded" required>
+                            <option value="">先に項目を選択</option>
+                        </select>
+                    </div>
+                    <div class="w-32">
+                        <label class="block mb-1">時間</label>
+                        <select name="hours[]" class="w-full p-2 border rounded" required>
+                            {% for i in range(1, 41) %}
+                                <option value="{{ "%.2f"|format(i * 0.25) }}">{{ "%.2f"|format(i * 0.25) }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="button" class="delete-row text-red-600 hover:underline mt-8">削除</button>
+                </div>
+            </div>
+
+            <button type="button" id="add-row" class="bg-blue-100 text-blue-700 border border-blue-500 px-3 py-1 rounded mb-4">＋ 行を追加</button>
+
+            <label class="block mb-2">コメント</label>
+            <textarea name="comment" rows="3" class="w-full p-2 border rounded mb-4"></textarea>
+
+            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">送信</button>
+
+            <a href="/master" class="ml-4 text-sm text-blue-600 underline">マスターを確認</a>
+        </form>
+    </div>
+
+    <script>
+        const categoryMap = {{ category_map|tojson }};
+        const container = document.getElementById('rows-container');
+
+        function updateDetailOptions(selectElem, selectedCategory) {
+            const detailSelect = selectElem.closest('.row').querySelector('.detail-select');
+            detailSelect.innerHTML = "";
+            if (categoryMap[selectedCategory]) {
+                for (const item of categoryMap[selectedCategory]) {
+                    const opt = document.createElement("option");
+                    opt.value = item;
+                    opt.textContent = item;
+                    detailSelect.appendChild(opt);
+                }
+            }
+        }
+
+        container.addEventListener('change', function(e) {
+            if (e.target.classList.contains('category-select')) {
+                updateDetailOptions(e.target, e.target.value);
+            }
+        });
+
+        document.getElementById('add-row').addEventListener('click', function() {
+            const row = container.querySelector('.row');
+            const clone = row.cloneNode(true);
+            clone.querySelectorAll('input, select').forEach(el => el.value = '');
+            container.appendChild(clone);
+        });
+
+        container.addEventListener('click', function(e) {
+            if (e.target.classList.contains('delete-row')) {
+                const rows = container.querySelectorAll('.row');
+                if (rows.length > 1) {
+                    e.target.closest('.row').remove();
+                }
+            }
+        });
+    </script>
+</body>
+</html>

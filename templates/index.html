@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>日報入力フォーム</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-6">
+  <div class="max-w-3xl mx-auto bg-white p-6 rounded shadow">
+    <h1 class="text-xl font-bold mb-4">📝 日報入力フォーム</h1>
+    <form action="/submit" method="POST" id="dailyForm">
+      <div class="mb-4">
+        <label for="report_date" class="block font-medium">日付</label>
+        <input
+          type="date"
+          id="report_date"
+          name="report_date"
+          class="border rounded w-full p-2 text-black"
+          oninput="this.style.color='black'"
+          onchange="this.blur()" />
+      </div>
+
+      <div class="mb-4">
+        <label for="name" class="block font-medium">氏名</label>
+        <select id="name" name="name" class="border rounded w-full p-2 text-black">
+          <option value="" selected>選択してください</option>
+          {% for n in names %}
+            <option value="{{ n }}">{{ n }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div id="entryContainer">
+        <div class="entry-group flex space-x-2 items-end mb-2">
+          <div class="flex-1">
+            <label class="block font-medium">項目</label>
+            <select name="category" class="category-select border rounded w-full p-2">
+              <option value="" selected>選択してください</option>
+              {% for cat in category_map %}
+                <option value="{{ cat }}">{{ cat }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="flex-1">
+            <label class="block font-medium">詳細</label>
+            <select name="detail" class="detail-select border rounded w-full p-2">
+              <option value="" selected>選択してください</option>
+            </select>
+          </div>
+          <div class="w-32">
+            <label class="block font-medium">時間</label>
+            <select name="hour" class="border rounded w-full p-2">
+              {% for i in range(1, 41) %}
+                <option value="{{ i / 4 }}">{{ i / 4 }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <button type="button" class="remove-btn text-red-500">削除</button>
+        </div>
+      </div>
+
+      <button type="button" onclick="addEntry()" class="mb-4 bg-blue-100 text-blue-800 px-3 py-1 rounded">＋行を追加</button>
+
+      <div class="mb-4">
+        <label for="comment" class="block font-medium">コメント</label>
+        <textarea id="comment" name="comment" rows="4" class="border rounded w-full p-2"></textarea>
+      </div>
+
+      <div class="flex items-center space-x-4">
+        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">送信</button>
+        <a href="/master" class="text-blue-600 underline">マスターを確認</a>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    const categoryMap = {{ category_map|tojson }};
+    function addEntry() {
+      const container = document.getElementById("entryContainer");
+      const group = document.createElement("div");
+      group.className = "entry-group flex space-x-2 items-end mb-2";
+      group.innerHTML = `
+        <div class="flex-1">
+          <select name="category" class="category-select border rounded w-full p-2">
+            <option value="" selected>選択してください</option>
+            ${Object.keys(categoryMap).map(cat => `<option value="${cat}">${cat}</option>`).join('')}
+          </select>
+        </div>
+        <div class="flex-1">
+          <select name="detail" class="detail-select border rounded w-full p-2">
+            <option value="" selected>選択してください</option>
+          </select>
+        </div>
+        <div class="w-32">
+          <select name="hour" class="border rounded w-full p-2">
+            ${Array.from({length: 40}, (_, i) => `<option value="${(i+1)/4}">${(i+1)/4}</option>`).join('')}
+          </select>
+        </div>
+        <button type="button" class="remove-btn text-red-500">削除</button>
+      `;
+      container.appendChild(group);
+    }
+
+    document.addEventListener("change", function (e) {
+      if (e.target.classList.contains("category-select")) {
+        const group = e.target.closest(".entry-group");
+        const detailSelect = group.querySelector(".detail-select");
+        const selected = e.target.value;
+        detailSelect.innerHTML = `<option value="" selected>選択してください</option>`;
+        if (categoryMap[selected]) {
+          categoryMap[selected].forEach(d => {
+            const opt = document.createElement("option");
+            opt.value = d;
+            opt.textContent = d;
+            detailSelect.appendChild(opt);
+          });
+        }
+      }
+    });
+
+    document.addEventListener("click", function (e) {
+      if (e.target.classList.contains("remove-btn")) {
+        e.target.closest(".entry-group").remove();
+      }
+    });
+  </script>
+</body>
+</html>
