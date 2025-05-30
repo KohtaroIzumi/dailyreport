@@ -17,7 +17,6 @@ HEADERS = {
     "Authorization": f"Bearer {SUPABASE_API_KEY}"
 }
 
-
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -25,7 +24,6 @@ def login_required(f):
             return redirect(url_for("login"))
         return f(*args, **kwargs)
     return decorated_function
-
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -38,12 +36,10 @@ def login():
             return render_template("login.html", error="パスワードが違います")
     return render_template("login.html")
 
-
 @app.route("/logout")
 def logout():
     session.pop("logged_in", None)
     return redirect(url_for("login"))
-
 
 @app.route("/")
 @login_required
@@ -61,7 +57,6 @@ def index():
         category_map.setdefault(cat, []).append(det)
 
     return render_template("index.html", names=names, categories=categories, category_map=category_map)
-
 
 @app.route("/submit", methods=["POST"])
 @login_required
@@ -91,7 +86,6 @@ def submit():
     except Exception as e:
         return jsonify({"message": "送信エラー"}), 500
 
-
 @app.route("/master")
 @login_required
 def master():
@@ -102,7 +96,6 @@ def master():
         for row in rows:
             category_map.setdefault(row["category"], []).append(row["detail"])
     return render_template("master.html", category_map=category_map)
-
 
 @app.route("/preview")
 @login_required
@@ -131,7 +124,6 @@ def preview():
     data = res.json() if res.status_code == 200 else []
 
     return render_template("preview.html", tasks=data, datadate=selected_date, name=selected_name)
-
 
 @app.route("/preview_api")
 @login_required
@@ -164,7 +156,6 @@ def preview_api():
             total += float(r.get("hours", 0))
 
     return jsonify({"monthly_hours": total})
-
 
 if __name__ == "__main__":
     app.run(debug=True)
