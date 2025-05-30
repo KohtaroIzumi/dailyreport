@@ -11,7 +11,7 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY")
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_API_KEY = os.getenv("SUPABASE_API_KEY")
-ACCESS_PASSWORD = os.getenv("ACCESS_PASSWORD")  # ← .envに合わせて統一
+ACCESS_PASSWORD = os.getenv("ACCESS_PASSWORD")
 HEADERS = {
     "apikey": SUPABASE_API_KEY,
     "Authorization": f"Bearer {SUPABASE_API_KEY}"
@@ -68,8 +68,6 @@ def index():
 def submit():
     try:
         data = request.json
-        print("DEBUG: 受信データ", data)
-
         date_str = data.get("date")
         name = data.get("name")
         tasks = data.get("tasks", [])
@@ -99,13 +97,21 @@ def submit():
 @app.route("/master")
 @login_required
 def master():
-    res = requests.get(f"{SUPABASE_URL}/rest/v1/master_category?select=category,detail", headers=HEADERS)
-    category_map = {}
-    if res.status_code == 200:
+    try:
+        res = requests.get(f"{SUPABASE_URL}/rest/v1/master_category?select=category,detail", headers=HEADERS)
+        res.raise_for_status()
         rows = res.json()
+        category_map = {}
         for row in rows:
-            category_map.setdefault(row["category"], []).append(row["detail"])
-    return render_template("master.html", category_map=category_map)
+            cat = row.get("category")
+            det = row.get("detail")
+            # None チェック（どちらか欠けていたら無視する）
+            if cat and det:
+                category_map.setdefault(cat, []).append(det)
+        return render_template("master.html", category_map=category_map)
+    except Exception as e:
+        print("ERROR in /master:", e)
+        return "サーバー内部エラー（/master で例外が発生しました）", 500
 
 
 @app.route("/preview")

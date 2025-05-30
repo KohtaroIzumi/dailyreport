@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>月次グラフ分析</title>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+</head>
+<body class="bg-light">
+<div class="container mt-4 mb-5">
+  <div class="card p-4">
+    <h4 class="mb-4">📊 月次グラフ分析</h4>
+
+    <div class="row mb-3">
+      <div class="col-md-4">
+        <label class="form-label">対象月</label>
+        <input type="month" id="month" class="form-control" />
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">氏名（空欄で全員）</label>
+        <select id="name" class="form-select">
+          <option value="">全員</option>
+          {% for n in names %}
+          <option value="{{ n }}">{{ n }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4 d-flex align-items-end">
+        <button class="btn btn-primary w-100" onclick="fetchGraph()">表示</button>
+      </div>
+    </div>
+
+    <h5 id="graph-title" class="mb-4"></h5>
+    <div class="row">
+      <div class="col-md-6">
+        <div id="pieChart"></div>
+      </div>
+      <div class="col-md-6">
+        <div id="barChart"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function fetchGraph() {
+  const monthVal = document.getElementById("month").value;
+  const nameVal = document.getElementById("name").value;
+
+  if (!monthVal) {
+    alert("対象月を選択してください");
+    return;
+  }
+
+  const [year, month] = monthVal.split("-");
+  const url = `/graph_data?year=${year}&month=${month}${nameVal ? `&name=${encodeURIComponent(nameVal)}` : ""}`;
+
+  fetch(url)
+    .then(res => res.json())
+    .then(data => {
+      if (!Array.isArray(data) || data.length === 0) {
+        document.getElementById("graph-title").textContent = "該当データがありません";
+        Plotly.purge("pieChart");
+        Plotly.purge("barChart");
+        return;
+      }
+
+      const grouped = {};
+      for (const row of data) {
+        const cat = row.category || "未分類";
+        const hours = parseFloat(row.hours) || 0;
+        grouped[cat] = (grouped[cat] || 0) + hours;
+      }
+
+      const labels = Object.keys(grouped);
+      const values = labels.map(k => grouped[k]);
+
+      document.getElementById("graph-title").textContent = `${nameVal || "全員"} の稼働内訳`;
+
+      Plotly.newPlot("pieChart", [{
+        type: "pie",
+        labels: labels,
+        values: values,
+        textinfo: "label+percent",
+        hole: 0  // 穴なしに設定
+      }], {
+        title: "円グラフ",
+        margin: { t: 40, l: 0, r: 0, b: 0 }
+      });
+
+      Plotly.newPlot("barChart", [{
+        type: "bar",
+        x: values,
+        y: labels,
+        orientation: "h"
+      }], {
+        title: "横棒グラフ",
+        margin: { t: 40 }
+      });
+    })
+    .catch(err => {
+      console.error("Graph Error", err);
+      alert("グラフ取得中にエラーが発生しました");
+    });
+}
+</script>
+</body>
+</html>

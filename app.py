@@ -17,7 +17,6 @@ HEADERS = {
     "Authorization": f"Bearer {SUPABASE_API_KEY}"
 }
 
-
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -25,7 +24,6 @@ def login_required(f):
             return redirect(url_for("login"))
         return f(*args, **kwargs)
     return decorated_function
-
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -38,12 +36,10 @@ def login():
             return render_template("login.html", error="パスワードが違います")
     return render_template("login.html")
 
-
 @app.route("/logout")
 def logout():
     session.pop("logged_in", None)
     return redirect(url_for("login"))
-
 
 @app.route("/")
 @login_required
@@ -61,7 +57,6 @@ def index():
         category_map.setdefault(cat, []).append(det)
 
     return render_template("index.html", names=names, categories=categories, category_map=category_map)
-
 
 @app.route("/submit", methods=["POST"])
 @login_required
@@ -81,18 +76,15 @@ def submit():
                 "hours": float(task.get("hours", 0)),
                 "comment": task.get("comment", "")
             }
-            res = requests.post(
+            requests.post(
                 f"{SUPABASE_URL}/rest/v1/daily_report",
                 headers={**HEADERS, "Content-Type": "application/json"},
                 json=payload
             )
-            print("DEBUG: Supabase応答", res.status_code, res.text)
-
         return jsonify({"message": "送信完了しました"})
     except Exception as e:
         print("ERROR:", str(e))
         return jsonify({"message": "送信エラー"}), 500
-
 
 @app.route("/master")
 @login_required
@@ -105,7 +97,6 @@ def master():
         for row in rows:
             cat = row.get("category")
             det = row.get("detail")
-            # None チェック（どちらか欠けていたら無視する）
             if cat and det:
                 category_map.setdefault(cat, []).append(det)
         return render_template("master.html", category_map=category_map)
@@ -113,12 +104,11 @@ def master():
         print("ERROR in /master:", e)
         return "サーバー内部エラー（/master で例外が発生しました）", 500
 
-
 @app.route("/preview")
 @login_required
 def preview():
     selected_date = request.args.get("date")
-    selected_name = request.args.get("name")
+    selected_name = request.args.get("name", "").strip()
 
     if not selected_date or not selected_name:
         return render_template("preview.html", tasks=[], datadate=selected_date, name=selected_name)
@@ -136,12 +126,10 @@ def preview():
         f"&report_date=gte.{start}"
         f"&report_date=lt.{end}"
     )
-
     res = requests.get(query_url, headers=HEADERS)
     data = res.json() if res.status_code == 200 else []
 
     return render_template("preview.html", tasks=data, datadate=selected_date, name=selected_name)
-
 
 @app.route("/preview_api")
 @login_required
@@ -172,11 +160,46 @@ def preview_api():
         rows = res.json()
         for r in rows:
             total += float(r.get("hours", 0))
-    else:
-        print("ERROR: Failed to fetch monthly hours:", res.status_code, res.text)
-
     return jsonify({"monthly_hours": total})
 
+@app.route("/graph")
+@login_required
+def graph():
+    res = requests.get(f"{SUPABASE_URL}/rest/v1/master_name?select=name", headers=HEADERS)
+    names = [r["name"] for r in res.json()] if res.status_code == 200 else []
+    return render_template("graph.html", names=names)
+
+@app.route("/graph_data")
+@login_required
+def graph_data():
+    name = request.args.get("name")
+    year = request.args.get("year")
+    month = request.args.get("month")
+
+    if not year or not month:
+        return jsonify({"error": "年月が必要です"}), 400
+
+    try:
+        name = name.strip() if name else None  # ← ここが重要
+        start = f"{year}-{month.zfill(2)}-01"
+        if month == "12":
+            end = f"{int(year)+1}-01-01"
+        else:
+            end = f"{year}-{str(int(month)+1).zfill(2)}-01"
+
+        filters = [f"report_date=gte.{start}", f"report_date=lt.{end}"]
+        if name:
+            filters.append(f"name=eq.{name}")
+        filter_str = "&".join(filters)
+
+        url = f"{SUPABASE_URL}/rest/v1/daily_report?{filter_str}"
+        res = requests.get(url, headers=HEADERS)
+        data = res.json() if res.status_code == 200 else []
+
+        return jsonify(data)
+    except Exception as e:
+        print("ERROR in /graph_data:", e)
+        return jsonify({"error": "内部処理エラー"}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)
