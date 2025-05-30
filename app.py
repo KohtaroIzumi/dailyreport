@@ -105,6 +105,7 @@ def master():
         for row in rows:
             cat = row.get("category")
             det = row.get("detail")
+            # None チェック（どちらか欠けていたら無視する）
             if cat and det:
                 category_map.setdefault(cat, []).append(det)
         return render_template("master.html", category_map=category_map)
