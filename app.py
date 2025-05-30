@@ -3,21 +3,21 @@ import os
 import json
 import requests
 from functools import wraps
-from datetime import datetime, timedelta
 from dotenv import load_dotenv
+from datetime import datetime
 
 load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_API_KEY")
+SUPABASE_API_KEY = os.getenv("SUPABASE_API_KEY")
 ACCESS_PASSWORD = os.getenv("ACCESS_PASSWORD")
 NOTICE_VERSION = os.getenv("NOTICE_VERSION")
 
 HEADERS = {
-    "apikey": SUPABASE_KEY,
-    "Authorization": f"Bearer {SUPABASE_KEY}",
+    "apikey": SUPABASE_API_KEY,
+    "Authorization": f"Bearer {SUPABASE_API_KEY}",
     "Content-Type": "application/json"
 }
 
@@ -44,7 +44,7 @@ def submit():
     data = request.get_json()
     tasks = data.get("tasks", [])
     for task in tasks:
-        response = requests.post(
+        requests.post(
             f"{SUPABASE_URL}/rest/v1/daily_report",
             headers=HEADERS,
             data=json.dumps(task)
@@ -94,45 +94,49 @@ def acknowledge_notice():
 def skip_notice():
     return redirect(url_for("index"))
 
+@app.route('/preview')
+@login_required
+def preview():
+    return render_template("preview.html")
+
 @app.route('/preview_api')
 @login_required
 def preview_api():
-    name = request.args.get("name")
-    date_str = request.args.get("date")
-    try:
-        base_date = datetime.strptime(date_str, "%Y-%m-%d")
-        month_start = base_date.replace(day=1).strftime("%Y-%m-%d")
-        next_month = (base_date.replace(day=28) + timedelta(days=4)).replace(day=1)
-        month_end = next_month.strftime("%Y-%m-%d")
-    except ValueError:
+    selected_date = request.args.get("date")
+    selected_name = request.args.get("name")
+
+    if not selected_date or not selected_name:
         return jsonify({"records": []})
 
-    params = {
-        "select": "*",
-        "and": f"(name.eq.{name},date.gte.{month_start},date.lt.{month_end})"
-    }
-    response = requests.get(f"{SUPABASE_URL}/rest/v1/daily_report", headers=HEADERS, params=params)
-    if response.status_code == 200:
-        return jsonify({"records": response.json()})
-    return jsonify({"records": []})
+    dt = datetime.strptime(selected_date, "%Y-%m-%d")
+    month = dt.strftime("%Y-%m")
+
+    query = (
+        f"{SUPABASE_URL}/rest/v1/daily_report"
+        f"?name=eq.{selected_name}"
+        f"&report_date=gte.{month}-01"
+        f"&report_date=lt.{dt.replace(day=28).replace(month=dt.month%12+1, day=1).strftime('%Y-%m-%d')}"
+    )
+
+    res = requests.get(query, headers=HEADERS)
+    if res.status_code != 200:
+        return jsonify({"records": []})
+
+    return jsonify({"records": res.json()})
 
 def fetch_names():
-    response = requests.get(f"{SUPABASE_URL}/rest/v1/master_name", headers=HEADERS)
-    if response.status_code == 200:
-        return [item["name"] for item in response.json()]
-    return []
+    res = requests.get(f"{SUPABASE_URL}/rest/v1/master_name", headers=HEADERS)
+    return [item["name"] for item in res.json()] if res.status_code == 200 else []
 
 def fetch_categories():
-    response = requests.get(f"{SUPABASE_URL}/rest/v1/master_category", headers=HEADERS)
-    if response.status_code == 200:
-        category_data = response.json()
-        categories = list({item["category"] for item in category_data})
+    res = requests.get(f"{SUPABASE_URL}/rest/v1/master_category", headers=HEADERS)
+    if res.status_code == 200:
+        data = res.json()
+        categories = list({item["category"] for item in data})
         category_map = {}
-        for item in category_data:
-            cat = item["category"]
-            detail = item["detail"]
-            category_map.setdefault(cat, []).append(detail)
-        return category_data, category_map
+        for item in data:
+            category_map.setdefault(item["category"], []).append(item["detail"])
+        return data, category_map
     return [], {}
 
 if __name__ == '__main__':

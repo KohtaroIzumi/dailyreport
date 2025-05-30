@@ -36,7 +36,7 @@
             let total = 0;
             for (const row of data.records) {
                 const tr = table.insertRow();
-                tr.insertCell().textContent = row.date || "";
+                tr.insertCell().textContent = row.report_date || "";
                 tr.insertCell().textContent = row.category || "";
                 tr.insertCell().textContent = row.detail || "";
                 tr.insertCell().textContent = row.hours || "";
@@ -46,7 +46,7 @@
 
             container.appendChild(table);
             const totalP = document.createElement("p");
-            totalP.textContent = `合計時間: ${total} 時間`;
+            totalP.textContent = `合計時間: ${total.toFixed(2)} 時間`;
             container.appendChild(totalP);
         }
 
