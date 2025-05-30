@@ -1,52 +1,37 @@
-<!-- notice.html（修正版・完全版）-->
 <!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
     <title>お知らせ</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-        body { font-family: sans-serif; padding: 20px; background: #f9f9f9; }
-        h1 { color: #333; }
-        .container { max-width: 800px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
-        button { padding: 0.5em 1em; font-size: 1em; }
-    </style>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
-<body>
-    <div class="container">
-        <h1>お知らせ</h1>
-        <p>このシステムのご利用にあたって、以下をご確認ください。</p>
-        <p>現在のバージョン: {{ version }}</p>
-        <form id="notice-form">
-            <label>
-                <input type="checkbox" id="ack" />
-                確認しました
-            </label>
-            <br><br>
-            <button type="button" onclick="proceed(true)">確認しました</button>
-            <button type="button" onclick="proceed(false)">お知らせを残したまま進む</button>
-        </form>
-    </div>
+<body class="bg-light">
+<div class="container mt-5">
+    <div class="card">
+        <div class="card-body">
+            <h3 class="card-title">📢 お知らせ</h3>
+            <p class="card-text">以下の内容をご確認ください。確認後、「確認しました」ボタンを押してください。</p>
 
-    <script>
-        function proceed(confirmed) {
-            const ackChecked = document.getElementById('ack').checked;
-            if (confirmed && !ackChecked) {
-                alert("チェックを入れてから進んでください。");
-                return;
-            }
-            fetch("/notice_ack", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ confirmed })
-            }).then(res => {
-                if (res.ok) {
-                    window.location.href = "/";
-                } else {
-                    alert("エラーが発生しました");
-                }
-            });
-        }
-    </script>
+            <div class="alert alert-info">
+                <p><strong>【お知らせ内容】</strong></p>
+                <p>今月の勤怠報告は5月末までに必ず提出してください。</p>
+            </div>
+
+            <form method="POST" action="/acknowledge_notice">
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" name="confirm" id="confirmCheck">
+                    <label class="form-check-label" for="confirmCheck">
+                        お知らせを確認しました
+                    </label>
+                </div>
+
+                <div class="d-flex gap-3">
+                    <button type="submit" class="btn btn-success">確認しました</button>
+                    <a href="/skip_notice" class="btn btn-secondary">お知らせを残したまま進む</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 </body>
 </html>
