@@ -2,101 +2,33 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
+    <title>お知らせ確認</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>お知らせ</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            padding: 1.5em;
-            margin: 0;
-            background-color: #f7f7f7;
-        }
-
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-            background: #fff;
-            padding: 2em;
-            border-radius: 10px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-        }
-
-        h1 {
-            text-align: center;
-            margin-bottom: 1em;
-            font-size: 1.5em;
-        }
-
-        .notice-box {
-            background-color: #fff9e6;
-            border-left: 6px solid #ffc107;
-            padding: 1em;
-            margin-bottom: 1.5em;
-            font-size: 1em;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 1em;
-            font-size: 0.95em;
-        }
-
-        .btn {
-            display: inline-block;
-            width: 100%;
-            background-color: #007bff;
-            color: white;
-            text-align: center;
-            padding: 0.75em;
-            text-decoration: none;
-            border-radius: 6px;
-            font-size: 1em;
-            border: none;
-            cursor: pointer;
-        }
-
-        .btn:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-        }
-
-        @media (max-width: 480px) {
-            .container {
-                padding: 1.2em;
-            }
-
-            .btn {
-                font-size: 0.95em;
-                padding: 0.7em;
-            }
-        }
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .notice-container { border: 1px solid #ccc; padding: 20px; background-color: #f9f9f9; margin-bottom: 20px; }
+        .buttons { display: flex; gap: 10px; }
+        button { padding: 10px 20px; font-size: 16px; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>お知らせ</h1>
-        <div class="notice-box">
-            <p>
-                5月の目標は「毎日こまめに記録する」ことです。<br>
-                勤怠報告と併せて、日報の記入も忘れずに行いましょう。
-            </p>
-        </div>
+    <h1>お知らせ</h1>
 
-        <form method="POST" action="{{ url_for('acknowledge_notice') }}">
-            <label>
-                <input type="checkbox" id="confirm" name="confirm">
-                上記のお知らせを確認しました
-            </label>
-            <button type="submit" class="btn" id="submitBtn" disabled>日報入力ページへ進む</button>
-        </form>
+    <div class="notice-container">
+        <p>以下のお知らせを必ず確認してください。確認後、下の「確認しました」ボタンを押してください。</p>
+        <hr>
+        <p>・5月よりフォーマットを更新しました。カテゴリ選択後、詳細リストが正しく表示されない場合は一度リロードしてください。</p>
+        <p>・「コメント欄」追加により、各行に補足事項を記入できます。</p>
+        <p>・「入力内容確認」ボタンから当月の登録内容を事前確認できます。</p>
+        <p>・システム更新：2025年5月30日版</p>
+        <hr>
     </div>
 
-    <script>
-        const checkbox = document.getElementById("confirm");
-        const button = document.getElementById("submitBtn");
-        checkbox.addEventListener("change", () => {
-            button.disabled = !checkbox.checked;
-        });
-    </script>
+    <form method="POST" action="{{ url_for('acknowledge_notice') }}">
+        <div class="buttons">
+            <button type="submit" name="action" value="acknowledge">確認しました</button>
+            <button type="submit" name="action" value="skip">お知らせを残したまま進む</button>
+        </div>
+    </form>
 </body>
 </html>

@@ -1,11 +1,10 @@
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 import os
 import requests
 from dotenv import load_dotenv
 from datetime import datetime
 from functools import wraps
 
-# .envの読み込み
 load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY")
@@ -13,50 +12,72 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_API_KEY = os.getenv("SUPABASE_API_KEY")
 ACCESS_PASSWORD = os.getenv("ACCESS_PASSWORD")
-
 HEADERS = {
     "apikey": SUPABASE_API_KEY,
     "Authorization": f"Bearer {SUPABASE_API_KEY}"
 }
 
-# ログイン必須デコレーター
+NOTICE_VERSION = "2025-05-30"  # ← 本日の日付が通知バージョン（将来的にはSupabaseから取得へ）
+
+# -------- 認証とお知らせ確認のチェック --------
+
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if not session.get("logged_in"):
+        if not session.get("authenticated"):
             return redirect(url_for("login"))
         return f(*args, **kwargs)
     return decorated_function
 
-# --- ルート定義 ---
+def notice_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        seen_version = session.get("notice_version")
+        skipped = session.get("notice_skipped")
+        if seen_version != NOTICE_VERSION and not skipped:
+            return redirect(url_for("notice"))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# -------- ルート --------
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        password = request.form.get("password")
+        password = request.form["password"]
         if password == ACCESS_PASSWORD:
-            session["logged_in"] = True
-            session["notice_acknowledged"] = False
+            session["authenticated"] = True
             return redirect(url_for("notice"))
         else:
-            return render_template("login.html", error="パスワードが違います。")
+            return render_template("login.html", error="パスワードが間違っています。")
     return render_template("login.html")
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
 
 @app.route("/notice")
 @login_required
 def notice():
-    if session.get("notice_acknowledged"):
-        return redirect(url_for("index"))
-    return render_template("notice.html")
+    return render_template("notice.html", notice_version=NOTICE_VERSION)
 
 @app.route("/acknowledge_notice", methods=["POST"])
 @login_required
 def acknowledge_notice():
-    session["notice_acknowledged"] = True
+    session["notice_version"] = NOTICE_VERSION
+    session["notice_skipped"] = False
+    return redirect(url_for("index"))
+
+@app.route("/skip_notice", methods=["POST"])
+@login_required
+def skip_notice():
+    session["notice_skipped"] = True
     return redirect(url_for("index"))
 
 @app.route("/")
 @login_required
+@notice_required
 def index():
     res_name = requests.get(f"{SUPABASE_URL}/rest/v1/master_name?select=name", headers=HEADERS)
     names = [row["name"] for row in res_name.json()] if res_name.status_code == 200 else []
@@ -66,9 +87,7 @@ def index():
 
     category_map = {}
     for row in categories:
-        cat = row["category"]
-        det = row["detail"]
-        category_map.setdefault(cat, []).append(det)
+        category_map.setdefault(row["category"], []).append(row["detail"])
 
     return render_template("index.html", names=names, categories=categories, category_map=category_map)
 
@@ -77,8 +96,6 @@ def index():
 def submit():
     try:
         data = request.json
-        print("DEBUG: 受信データ", data)
-
         date_str = data.get("date")
         name = data.get("name")
         tasks = data.get("tasks", [])
@@ -92,31 +109,30 @@ def submit():
                 "hours": float(task.get("hours", 0)),
                 "comment": task.get("comment", "")
             }
-            res = requests.post(
+            requests.post(
                 f"{SUPABASE_URL}/rest/v1/daily_report",
                 headers={**HEADERS, "Content-Type": "application/json"},
                 json=payload
             )
-            print("DEBUG: Supabase応答", res.status_code, res.text)
 
         return jsonify({"message": "送信完了しました"})
     except Exception as e:
-        print("ERROR:", str(e))
         return jsonify({"message": "送信エラー"}), 500
 
 @app.route("/master")
 @login_required
+@notice_required
 def master():
     res = requests.get(f"{SUPABASE_URL}/rest/v1/master_category?select=category,detail", headers=HEADERS)
     category_map = {}
     if res.status_code == 200:
-        rows = res.json()
-        for row in rows:
+        for row in res.json():
             category_map.setdefault(row["category"], []).append(row["detail"])
     return render_template("master.html", category_map=category_map)
 
 @app.route("/preview")
 @login_required
+@notice_required
 def preview():
     selected_date = request.args.get("date")
     selected_name = request.args.get("name")
@@ -139,12 +155,7 @@ def preview():
     )
 
     res = requests.get(query_url, headers=HEADERS)
-    if res.status_code == 200:
-        data = res.json()
-    else:
-        print("ERROR: Failed to fetch preview data:", res.status_code, res.text)
-        data = []
-
+    data = res.json() if res.status_code == 200 else []
     return render_template("preview.html", tasks=data, datadate=selected_date, name=selected_name)
 
 @app.route("/preview_api")
@@ -171,14 +182,7 @@ def preview_api():
     )
 
     res = requests.get(query_url, headers=HEADERS)
-    total = 0
-    if res.status_code == 200:
-        rows = res.json()
-        for r in rows:
-            total += float(r.get("hours", 0))
-    else:
-        print("ERROR: Failed to fetch monthly hours:", res.status_code, res.text)
-
+    total = sum(float(row.get("hours", 0)) for row in res.json()) if res.status_code == 200 else 0
     return jsonify({"monthly_hours": total})
 
 if __name__ == "__main__":
