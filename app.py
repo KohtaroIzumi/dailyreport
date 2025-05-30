@@ -1,8 +1,9 @@
-from flask import Flask, render_template, request, redirect, url_for, session
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 import os
 import json
 import requests
 from functools import wraps
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -50,29 +51,6 @@ def submit():
         )
     return ("", 204)
 
-@app.route('/preview')
-@login_required
-def preview():
-    date = request.args.get("date")
-    name = request.args.get("name")
-    if not date or not name:
-        return "必要な情報が不足しています", 400
-
-    yyyymm = "-".join(date.split("-")[:2])
-    params = {
-        "select": "*",
-        "name": f"eq.{name}",
-        "date": f"like.{yyyymm}-%"
-    }
-    query_string = "&".join([f"{k}={v}" for k, v in params.items()])
-    response = requests.get(f"{SUPABASE_URL}/rest/v1/daily_report?{query_string}", headers=HEADERS)
-    if response.status_code != 200:
-        return "データ取得に失敗しました", 500
-
-    records = response.json()
-    total_hours = sum(float(row.get("hours", 0)) for row in records)
-    return render_template("preview.html", records=records, total_hours=total_hours, date=date, name=name)
-
 @app.route('/master')
 @login_required
 def master():
@@ -115,6 +93,28 @@ def acknowledge_notice():
 @login_required
 def skip_notice():
     return redirect(url_for("index"))
+
+@app.route('/preview_api')
+@login_required
+def preview_api():
+    name = request.args.get("name")
+    date_str = request.args.get("date")
+    try:
+        base_date = datetime.strptime(date_str, "%Y-%m-%d")
+        month_start = base_date.replace(day=1).strftime("%Y-%m-%d")
+        next_month = (base_date.replace(day=28) + timedelta(days=4)).replace(day=1)
+        month_end = next_month.strftime("%Y-%m-%d")
+    except ValueError:
+        return jsonify({"records": []})
+
+    params = {
+        "select": "*",
+        "and": f"(name.eq.{name},date.gte.{month_start},date.lt.{month_end})"
+    }
+    response = requests.get(f"{SUPABASE_URL}/rest/v1/daily_report", headers=HEADERS, params=params)
+    if response.status_code == 200:
+        return jsonify({"records": response.json()})
+    return jsonify({"records": []})
 
 def fetch_names():
     response = requests.get(f"{SUPABASE_URL}/rest/v1/master_name", headers=HEADERS)
