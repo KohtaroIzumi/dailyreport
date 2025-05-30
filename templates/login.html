@@ -2,38 +2,69 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ログイン</title>
     <style>
         body {
             font-family: sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background: #f0f0f0;
+        }
+        .login-box {
+            background: white;
+            padding: 2em;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            width: 90%;
+            max-width: 400px;
+        }
+        h2 {
             text-align: center;
-            margin-top: 100px;
+            margin-bottom: 1.2em;
+            font-size: 1.5em;
         }
         input[type="password"] {
-            padding: 10px;
-            font-size: 16px;
-            margin-top: 10px;
+            width: 100%;
+            padding: 0.8em;
+            margin-bottom: 1em;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 1em;
         }
         input[type="submit"] {
-            padding: 10px 20px;
-            font-size: 16px;
-            margin-top: 20px;
+            width: 100%;
+            padding: 0.8em;
+            background-color: #007bff;
+            border: none;
+            color: white;
+            font-size: 1em;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        input[type="submit"]:hover {
+            background-color: #0056b3;
         }
         .error {
             color: red;
-            margin-top: 20px;
+            margin-top: 0.5em;
+            text-align: center;
         }
     </style>
 </head>
 <body>
-    <h1>パスワード認証</h1>
-    <form method="POST">
-        <input type="password" name="password" placeholder="パスワードを入力">
-        <br>
-        <input type="submit" value="ログイン">
-    </form>
-    {% if error %}
+    <div class="login-box">
+        <h2>ログイン</h2>
+        <form method="POST">
+            <input type="password" name="password" placeholder="パスワードを入力" required>
+            <input type="submit" value="ログイン">
+        </form>
+        {% if error %}
         <div class="error">{{ error }}</div>
-    {% endif %}
+        {% endif %}
+    </div>
 </body>
 </html>

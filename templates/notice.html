@@ -2,36 +2,72 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>お知らせ</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 1em;
+            margin: 0;
+        }
+        h2 {
+            font-size: 1.5em;
+            margin-bottom: 0.5em;
+        }
+        p {
+            margin-bottom: 1em;
+            line-height: 1.5;
+        }
+        .notice-box {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            padding: 1em;
+            margin-bottom: 1em;
+            border-radius: 5px;
+        }
+        form {
+            margin-top: 1em;
+        }
+        label {
+            display: block;
+            margin-bottom: 1em;
+        }
+        button {
+            margin-right: 0.5em;
+            padding: 0.5em 1.2em;
+            font-size: 1em;
+        }
+
+        @media screen and (max-width: 600px) {
+            h2 {
+                font-size: 1.3em;
+            }
+            button {
+                width: 100%;
+                margin-top: 0.5em;
+            }
+        }
+    </style>
 </head>
-<body class="bg-light">
-<div class="container mt-5">
-    <div class="card">
-        <div class="card-body">
-            <h3 class="card-title">📢 お知らせ</h3>
-            <p class="card-text">以下の内容をご確認ください。確認後、「確認しました」ボタンを押してください。</p>
-
-            <div class="alert alert-info">
-                <p><strong>【お知らせ内容】</strong></p>
-                <p>今月の勤怠報告は月末までに必ず提出してください。</p>
-            </div>
-
-            <form method="POST" action="/acknowledge_notice">
-                <div class="form-check mb-3">
-                    <input class="form-check-input" type="checkbox" name="confirm" id="confirmCheck">
-                    <label class="form-check-label" for="confirmCheck">
-                        お知らせを確認しました
-                    </label>
-                </div>
-
-                <div class="d-flex gap-3">
-                    <button type="submit" class="btn btn-success">確認しました</button>
-                    <a href="/skip_notice" class="btn btn-secondary">お知らせを残したまま進む</a>
-                </div>
-            </form>
-        </div>
+<body>
+    <h2>お知らせ</h2>
+    <div class="notice-box">
+        <p>このアプリに関する最新のお知らせです（バージョン {{ version }}）</p>
+        <ul>
+            <li>機能改善、バグ修正などの案内がここに記載されます。</li>
+            <li>最新情報をご確認の上、内容に同意して次に進んでください。</li>
+        </ul>
     </div>
-</div>
+
+    <form action="/acknowledge_notice" method="post">
+        <label>
+            <input type="checkbox" name="confirm" required>
+            内容を確認しました
+        </label>
+        <button type="submit">次に進む</button>
+    </form>
+    <form action="/skip_notice" method="get" style="margin-top: 0.5em;">
+        <button type="submit">お知らせを残したまま進む</button>
+    </form>
 </body>
 </html>
