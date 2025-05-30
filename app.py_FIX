@@ -5,21 +5,19 @@ from dotenv import load_dotenv
 from datetime import datetime
 from functools import wraps
 
-# .envの読み込み
 load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY")
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_API_KEY = os.getenv("SUPABASE_API_KEY")
-ACCESS_PASSWORD = os.getenv("ACCESS_PASSWORD")
-
+ACCESS_PASSWORD = os.getenv("ACCESS_PASSWORD")  # ← .envに合わせて統一
 HEADERS = {
     "apikey": SUPABASE_API_KEY,
     "Authorization": f"Bearer {SUPABASE_API_KEY}"
 }
 
-# ログイン必須デコレーター
+
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -28,32 +26,25 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-# ログインページ
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    error = None
     if request.method == "POST":
         password = request.form.get("password")
         if password == ACCESS_PASSWORD:
             session["logged_in"] = True
-            return redirect(url_for("notice"))
+            return redirect(url_for("index"))
         else:
-            error = "パスワードが違います。"
-    return render_template("login.html", error=error)
+            return render_template("login.html", error="パスワードが違います")
+    return render_template("login.html")
 
-# ログアウト（任意で使用可能）
+
 @app.route("/logout")
 def logout():
-    session.clear()
+    session.pop("logged_in", None)
     return redirect(url_for("login"))
 
-# お知らせページ（ログイン後に最初に表示される）
-@app.route("/notice")
-@login_required
-def notice():
-    return render_template("notice.html")
 
-# トップページ（日報フォーム）
 @app.route("/")
 @login_required
 def index():
@@ -71,11 +62,14 @@ def index():
 
     return render_template("index.html", names=names, categories=categories, category_map=category_map)
 
+
 @app.route("/submit", methods=["POST"])
 @login_required
 def submit():
     try:
         data = request.json
+        print("DEBUG: 受信データ", data)
+
         date_str = data.get("date")
         name = data.get("name")
         tasks = data.get("tasks", [])
@@ -89,15 +83,18 @@ def submit():
                 "hours": float(task.get("hours", 0)),
                 "comment": task.get("comment", "")
             }
-            requests.post(
+            res = requests.post(
                 f"{SUPABASE_URL}/rest/v1/daily_report",
                 headers={**HEADERS, "Content-Type": "application/json"},
                 json=payload
             )
+            print("DEBUG: Supabase応答", res.status_code, res.text)
+
         return jsonify({"message": "送信完了しました"})
     except Exception as e:
         print("ERROR:", str(e))
         return jsonify({"message": "送信エラー"}), 500
+
 
 @app.route("/master")
 @login_required
@@ -109,6 +106,7 @@ def master():
         for row in rows:
             category_map.setdefault(row["category"], []).append(row["detail"])
     return render_template("master.html", category_map=category_map)
+
 
 @app.route("/preview")
 @login_required
@@ -135,7 +133,9 @@ def preview():
 
     res = requests.get(query_url, headers=HEADERS)
     data = res.json() if res.status_code == 200 else []
+
     return render_template("preview.html", tasks=data, datadate=selected_date, name=selected_name)
+
 
 @app.route("/preview_api")
 @login_required
@@ -166,7 +166,11 @@ def preview_api():
         rows = res.json()
         for r in rows:
             total += float(r.get("hours", 0))
+    else:
+        print("ERROR: Failed to fetch monthly hours:", res.status_code, res.text)
+
     return jsonify({"monthly_hours": total})
+
 
 if __name__ == "__main__":
     app.run(debug=True)
