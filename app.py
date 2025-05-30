@@ -1,143 +1,170 @@
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 import os
-import json
 import requests
-from functools import wraps
 from dotenv import load_dotenv
 from datetime import datetime
+from functools import wraps
 
 load_dotenv()
-
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY")
+
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_API_KEY = os.getenv("SUPABASE_API_KEY")
 ACCESS_PASSWORD = os.getenv("ACCESS_PASSWORD")
-NOTICE_VERSION = os.getenv("NOTICE_VERSION")
-
 HEADERS = {
     "apikey": SUPABASE_API_KEY,
-    "Authorization": f"Bearer {SUPABASE_API_KEY}",
-    "Content-Type": "application/json"
+    "Authorization": f"Bearer {SUPABASE_API_KEY}"
 }
+
 
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'logged_in' not in session:
-            return redirect(url_for('login'))
+        if not session.get("logged_in"):
+            return redirect(url_for("login"))
         return f(*args, **kwargs)
     return decorated_function
 
-@app.route('/')
-@login_required
-def index():
-    if session.get("notice_checked_version") != NOTICE_VERSION:
-        return redirect(url_for("notice"))
-    names = fetch_names()
-    categories, category_map = fetch_categories()
-    return render_template("index.html", names=names, categories=categories, category_map=category_map)
 
-@app.route('/submit', methods=['POST'])
-@login_required
-def submit():
-    data = request.get_json()
-    tasks = data.get("tasks", [])
-    for task in tasks:
-        requests.post(
-            f"{SUPABASE_URL}/rest/v1/daily_report",
-            headers=HEADERS,
-            data=json.dumps(task)
-        )
-    return ("", 204)
-
-@app.route('/master')
-@login_required
-def master():
-    categories, _ = fetch_categories()
-    grouped = {}
-    for item in categories:
-        cat = item['category']
-        grouped.setdefault(cat, []).append(item['detail'])
-    return render_template("master.html", grouped=grouped)
-
-@app.route('/login', methods=['GET', 'POST'])
+@app.route("/login", methods=["GET", "POST"])
 def login():
-    if request.method == 'POST':
-        password = request.form['password']
+    if request.method == "POST":
+        password = request.form.get("password")
         if password == ACCESS_PASSWORD:
-            session['logged_in'] = True
-            return redirect(url_for('index'))
-        return render_template("login.html", error="パスワードが間違っています")
+            session["logged_in"] = True
+            return redirect(url_for("index"))
+        else:
+            return render_template("login.html", error="パスワードが違います")
     return render_template("login.html")
 
-@app.route('/logout')
+
+@app.route("/logout")
 def logout():
-    session.clear()
-    return redirect(url_for('login'))
+    session.pop("logged_in", None)
+    return redirect(url_for("login"))
 
-@app.route('/notice')
+
+@app.route("/")
 @login_required
-def notice():
-    return render_template("notice.html", version=NOTICE_VERSION)
+def index():
+    res_name = requests.get(f"{SUPABASE_URL}/rest/v1/master_name?select=name", headers=HEADERS)
+    names = [row["name"] for row in res_name.json()] if res_name.status_code == 200 else []
 
-@app.route('/acknowledge_notice', methods=["POST"])
+    res_cat = requests.get(f"{SUPABASE_URL}/rest/v1/master_category?select=category,detail", headers=HEADERS)
+    categories = res_cat.json() if res_cat.status_code == 200 else []
+
+    category_map = {}
+    for row in categories:
+        cat = row["category"]
+        det = row["detail"]
+        category_map.setdefault(cat, []).append(det)
+
+    return render_template("index.html", names=names, categories=categories, category_map=category_map)
+
+
+@app.route("/submit", methods=["POST"])
 @login_required
-def acknowledge_notice():
-    if request.form.get("confirm"):
-        session["notice_checked_version"] = NOTICE_VERSION
-        return redirect(url_for("index"))
-    return redirect(url_for("notice"))
+def submit():
+    try:
+        data = request.json
+        date_str = data.get("date")
+        name = data.get("name")
+        tasks = data.get("tasks", [])
 
-@app.route('/skip_notice')
+        for task in tasks:
+            payload = {
+                "report_date": date_str,
+                "name": name,
+                "category": task.get("category"),
+                "detail": task.get("detail"),
+                "hours": float(task.get("hours", 0)),
+                "comment": task.get("comment", "")
+            }
+            res = requests.post(
+                f"{SUPABASE_URL}/rest/v1/daily_report",
+                headers={**HEADERS, "Content-Type": "application/json"},
+                json=payload
+            )
+
+        return jsonify({"message": "送信完了しました"})
+    except Exception as e:
+        return jsonify({"message": "送信エラー"}), 500
+
+
+@app.route("/master")
 @login_required
-def skip_notice():
-    return redirect(url_for("index"))
+def master():
+    res = requests.get(f"{SUPABASE_URL}/rest/v1/master_category?select=category,detail", headers=HEADERS)
+    category_map = {}
+    if res.status_code == 200:
+        rows = res.json()
+        for row in rows:
+            category_map.setdefault(row["category"], []).append(row["detail"])
+    return render_template("master.html", category_map=category_map)
 
-@app.route('/preview')
+
+@app.route("/preview")
 @login_required
 def preview():
-    return render_template("preview.html")
+    selected_date = request.args.get("date")
+    selected_name = request.args.get("name")
 
-@app.route('/preview_api')
+    if not selected_date or not selected_name:
+        return render_template("preview.html", tasks=[], datadate=selected_date, name=selected_name)
+
+    dt = datetime.strptime(selected_date, "%Y-%m-%d")
+    start = dt.replace(day=1).strftime("%Y-%m-%d")
+    if dt.month == 12:
+        end = dt.replace(year=dt.year + 1, month=1, day=1).strftime("%Y-%m-%d")
+    else:
+        end = dt.replace(month=dt.month + 1, day=1).strftime("%Y-%m-%d")
+
+    query_url = (
+        f"{SUPABASE_URL}/rest/v1/daily_report"
+        f"?name=eq.{selected_name}"
+        f"&report_date=gte.{start}"
+        f"&report_date=lt.{end}"
+    )
+
+    res = requests.get(query_url, headers=HEADERS)
+    data = res.json() if res.status_code == 200 else []
+
+    return render_template("preview.html", tasks=data, datadate=selected_date, name=selected_name)
+
+
+@app.route("/preview_api")
 @login_required
 def preview_api():
     selected_date = request.args.get("date")
     selected_name = request.args.get("name")
 
     if not selected_date or not selected_name:
-        return jsonify({"records": []})
+        return jsonify({"monthly_hours": 0})
 
     dt = datetime.strptime(selected_date, "%Y-%m-%d")
-    month = dt.strftime("%Y-%m")
+    start = dt.replace(day=1).strftime("%Y-%m-%d")
+    if dt.month == 12:
+        end = dt.replace(year=dt.year + 1, month=1, day=1).strftime("%Y-%m-%d")
+    else:
+        end = dt.replace(month=dt.month + 1, day=1).strftime("%Y-%m-%d")
 
-    query = (
+    query_url = (
         f"{SUPABASE_URL}/rest/v1/daily_report"
         f"?name=eq.{selected_name}"
-        f"&report_date=gte.{month}-01"
-        f"&report_date=lt.{dt.replace(day=28).replace(month=dt.month%12+1, day=1).strftime('%Y-%m-%d')}"
+        f"&report_date=gte.{start}"
+        f"&report_date=lt.{end}"
     )
 
-    res = requests.get(query, headers=HEADERS)
-    if res.status_code != 200:
-        return jsonify({"records": []})
-
-    return jsonify({"records": res.json()})
-
-def fetch_names():
-    res = requests.get(f"{SUPABASE_URL}/rest/v1/master_name", headers=HEADERS)
-    return [item["name"] for item in res.json()] if res.status_code == 200 else []
-
-def fetch_categories():
-    res = requests.get(f"{SUPABASE_URL}/rest/v1/master_category", headers=HEADERS)
+    res = requests.get(query_url, headers=HEADERS)
+    total = 0
     if res.status_code == 200:
-        data = res.json()
-        categories = list({item["category"] for item in data})
-        category_map = {}
-        for item in data:
-            category_map.setdefault(item["category"], []).append(item["detail"])
-        return data, category_map
-    return [], {}
+        rows = res.json()
+        for r in rows:
+            total += float(r.get("hours", 0))
 
-if __name__ == '__main__':
+    return jsonify({"monthly_hours": total})
+
+
+if __name__ == "__main__":
     app.run(debug=True)
