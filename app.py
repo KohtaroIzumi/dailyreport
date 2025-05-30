@@ -154,7 +154,6 @@ def preview_api():
         rows = res.json()
         for r in rows:
             total += float(r.get("hours", 0))
-
     return jsonify({"monthly_hours": total})
 
 if __name__ == "__main__":

@@ -2,34 +2,29 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>日報入力フォーム</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        body { background-color: #f8f9fa; }
-        .card { margin-top: 30px; }
-    </style>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
 </head>
-<body>
-<div class="container">
+<body class="bg-light">
+<div class="container mt-5 mb-5">
     <div class="card">
         <div class="card-body">
-            <h3 class="card-title mb-4">📝 日報入力フォーム</h3>
+            <h5 class="card-title mb-4">📝 日報入力フォーム</h5>
+
             <form id="reportForm">
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <label for="date" class="form-label">日付</label>
-                        <input type="date" class="form-control" id="date" name="date" required>
-                    </div>
-                    <div class="col-md-6">
-                        <label for="name" class="form-label">氏名</label>
-                        <select class="form-select" id="name" name="name" required>
-                            <option value="">選択してください</option>
-                            {% for n in names %}
-                                <option value="{{n}}">{{n}}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
+                <div class="mb-3">
+                    <label for="date" class="form-label">日付</label>
+                    <input type="date" class="form-control" id="date" name="date" required>
+                </div>
+
+                <div class="mb-3">
+                    <label for="name" class="form-label">氏名</label>
+                    <select class="form-select" id="name" name="name" required>
+                        <option value="">選択してください</option>
+                        {% for n in names %}
+                        <option value="{{n}}">{{n}}</option>
+                        {% endfor %}
+                    </select>
                 </div>
 
                 <div id="task-rows">
@@ -37,21 +32,21 @@
                         <div class="col-md-3">
                             <select class="form-select category-select" name="category">
                                 {% for c in category_map %}
-                                    <option value="{{c}}">{{c}}</option>
+                                <option value="{{c}}">{{c}}</option>
                                 {% endfor %}
                             </select>
                         </div>
                         <div class="col-md-3">
                             <select class="form-select detail-select" name="detail">
                                 {% for d in category_map[category_map|list|first] %}
-                                    <option value="{{d}}">{{d}}</option>
+                                <option value="{{d}}">{{d}}</option>
                                 {% endfor %}
                             </select>
                         </div>
                         <div class="col-md-2">
                             <select class="form-select" name="hours">
                                 {% for i in range(1, 33) %}
-                                    <option value="{{ i * 0.25 }}">{{ i * 0.25 }}</option>
+                                <option value="{{ i * 0.25 }}">{{ i * 0.25 }}</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -64,13 +59,17 @@
                     </div>
                 </div>
 
-                <button type="button" class="btn btn-outline-secondary mb-3" id="addRow">＋行を追加</button>
-                <p><strong>本日の合計時間:</strong> <span id="todayTotal">0</span> 時間 / <strong>今月の合計時間:</strong> <span id="monthTotal">0</span> 時間</p>
+                <button type="button" class="btn btn-outline-primary mb-3" id="addRow">＋行を追加</button>
 
-                <div class="d-flex gap-3">
-                    <button type="submit" class="btn btn-success">送信</button>
-                    <button type="button" class="btn btn-primary" id="previewButton">入力内容確認</button>
-                    <a href="#" class="btn btn-secondary" id="masterButton">マスター一覧を見る</a>
+                <div class="mb-3">
+                    <p>📊 今月の合計時間：<span id="monthlyHours">-</span></p>
+                    <p>🕓 当日の入力時間：<span id="dailyHours">0.00</span> 時間</p>
+                </div>
+
+                <div class="d-flex justify-content-start gap-3">
+                    <button type="submit" class="btn btn-primary">送信</button>
+                    <button type="button" class="btn btn-secondary" id="previewButton">入力内容確認</button>
+                    <a href="/master" class="btn btn-link">マスターを確認</a>
                 </div>
             </form>
         </div>
@@ -93,20 +92,24 @@
     }
 
     function updateTotalHours() {
-        let today = 0.0;
-        document.querySelectorAll("select[name='hours']").forEach(s => {
-            today += parseFloat(s.value || 0);
+        const taskRows = document.querySelectorAll(".task-row");
+        let total = 0;
+        taskRows.forEach(row => {
+            const val = parseFloat(row.querySelector("select[name='hours']").value);
+            total += isNaN(val) ? 0 : val;
         });
-        document.getElementById("todayTotal").textContent = today.toFixed(2);
+        document.getElementById("dailyHours").textContent = total.toFixed(2);
+    }
 
-        const name = document.getElementById("name").value;
+    async function fetchMonthlyHours() {
         const date = document.getElementById("date").value;
-        if (name && date) {
-            fetch(`/preview_api?date=${date}&name=${name}`)
-                .then(res => res.json())
-                .then(data => {
-                    document.getElementById("monthTotal").textContent = (data.monthly_hours || 0).toFixed(2);
-                });
+        const name = document.getElementById("name").value;
+        if (!date || !name) return;
+        const url = `/preview_api?date=${encodeURIComponent(date)}&name=${encodeURIComponent(name)}`;
+        const res = await fetch(url);
+        const result = await res.json();
+        if (res.ok && result.monthly_hours !== undefined) {
+            document.getElementById("monthlyHours").textContent = result.monthly_hours.toFixed(2) + " 時間";
         }
     }
 
@@ -143,18 +146,17 @@
         sel.addEventListener("change", updateTotalHours);
     });
 
-    document.getElementById("name").addEventListener("change", updateTotalHours);
-    document.getElementById("date").addEventListener("change", updateTotalHours);
+    document.getElementById("date").addEventListener("change", fetchMonthlyHours);
+    document.getElementById("name").addEventListener("change", fetchMonthlyHours);
 
     document.getElementById("reportForm").addEventListener("submit", async (e) => {
         e.preventDefault();
+
         const date = document.getElementById("date").value;
         const name = document.getElementById("name").value;
         const taskRows = document.querySelectorAll(".task-row");
 
         const tasks = Array.from(taskRows).map(row => ({
-            report_date: date,
-            name,
             category: row.querySelector("select[name='category']").value,
             detail: row.querySelector("select[name='detail']").value,
             hours: row.querySelector("select[name='hours']").value,
@@ -163,11 +165,18 @@
 
         const res = await fetch("/submit", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ tasks })
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ date, name, tasks })
         });
 
-        alert(res.ok ? "送信が完了しました" : "送信に失敗しました");
+        const result = await res.json();
+        if (res.ok) {
+            alert(result.message);
+        } else {
+            alert("送信失敗: " + result.message);
+        }
     });
 
     document.getElementById("previewButton").addEventListener("click", () => {
@@ -179,10 +188,6 @@
         }
         const url = `/preview?date=${encodeURIComponent(date)}&name=${encodeURIComponent(name)}`;
         window.open(url, "_blank", "width=800,height=600");
-    });
-
-    document.getElementById("masterButton").addEventListener("click", () => {
-        window.open("/master", "_blank", "width=800,height=600");
     });
 </script>
 </body>
