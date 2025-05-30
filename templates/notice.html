@@ -1,34 +1,29 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <title>お知らせ確認</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        body { font-family: Arial, sans-serif; padding: 20px; }
-        .notice-container { border: 1px solid #ccc; padding: 20px; background-color: #f9f9f9; margin-bottom: 20px; }
-        .buttons { display: flex; gap: 10px; }
-        button { padding: 10px 20px; font-size: 16px; }
-    </style>
-</head>
-<body>
-    <h1>お知らせ</h1>
-
-    <div class="notice-container">
-        <p>以下のお知らせを必ず確認してください。確認後、下の「確認しました」ボタンを押してください。</p>
-        <hr>
-        <p>・5月よりフォーマットを更新しました。カテゴリ選択後、詳細リストが正しく表示されない場合は一度リロードしてください。</p>
-        <p>・「コメント欄」追加により、各行に補足事項を記入できます。</p>
-        <p>・「入力内容確認」ボタンから当月の登録内容を事前確認できます。</p>
-        <p>・システム更新：2025年5月30日版</p>
-        <hr>
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-5">
+    <h2 class="mb-4">お知らせ</h2>
+    <div class="card mb-4">
+        <div class="card-body">
+            <p>以下のお知らせを必ず確認してください。確認後、下の「確認しました」ボタンを押してください。</p>
+            <hr>
+            <ul>
+                <li>5月よりフォーマットを更新しました。カテゴリ選択後、詳細リストが正しく表示されない場合は一度リロードしてください。</li>
+                <li>「コメント欄」追加により、各行に補足事項を記入できます。</li>
+                <li>「入力内容確認」ボタンから当月の登録内容を事前確認できます。</li>
+                <li>システム更新：2025年5月30日版</li>
+            </ul>
+        </div>
     </div>
 
     <form method="POST" action="{{ url_for('acknowledge_notice') }}">
-        <div class="buttons">
-            <button type="submit" name="action" value="acknowledge">確認しました</button>
-            <button type="submit" name="action" value="skip">お知らせを残したまま進む</button>
+        <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" name="confirm" id="confirm">
+            <label class="form-check-label" for="confirm">
+                上記のお知らせを確認しました
+            </label>
         </div>
+        <button type="submit" class="btn btn-primary">確認しました</button>
+        <a href="{{ url_for('skip_notice') }}" class="btn btn-secondary">お知らせを残したまま進む</a>
     </form>
-</body>
-</html>
+</div>
+{% endblock %}
