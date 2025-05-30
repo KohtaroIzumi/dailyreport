@@ -28,32 +28,33 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-# ログインページ
+# --- ルート定義 ---
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    error = None
     if request.method == "POST":
         password = request.form.get("password")
         if password == ACCESS_PASSWORD:
             session["logged_in"] = True
+            session["notice_acknowledged"] = False
             return redirect(url_for("notice"))
         else:
-            error = "パスワードが違います。"
-    return render_template("login.html", error=error)
+            return render_template("login.html", error="パスワードが違います。")
+    return render_template("login.html")
 
-# ログアウト（任意で使用可能）
-@app.route("/logout")
-def logout():
-    session.clear()
-    return redirect(url_for("login"))
-
-# お知らせページ（ログイン後に最初に表示される）
 @app.route("/notice")
 @login_required
 def notice():
+    if session.get("notice_acknowledged"):
+        return redirect(url_for("index"))
     return render_template("notice.html")
 
-# トップページ（日報フォーム）
+@app.route("/acknowledge_notice", methods=["POST"])
+@login_required
+def acknowledge_notice():
+    session["notice_acknowledged"] = True
+    return redirect(url_for("index"))
+
 @app.route("/")
 @login_required
 def index():
@@ -76,6 +77,8 @@ def index():
 def submit():
     try:
         data = request.json
+        print("DEBUG: 受信データ", data)
+
         date_str = data.get("date")
         name = data.get("name")
         tasks = data.get("tasks", [])
@@ -89,11 +92,13 @@ def submit():
                 "hours": float(task.get("hours", 0)),
                 "comment": task.get("comment", "")
             }
-            requests.post(
+            res = requests.post(
                 f"{SUPABASE_URL}/rest/v1/daily_report",
                 headers={**HEADERS, "Content-Type": "application/json"},
                 json=payload
             )
+            print("DEBUG: Supabase応答", res.status_code, res.text)
+
         return jsonify({"message": "送信完了しました"})
     except Exception as e:
         print("ERROR:", str(e))
@@ -134,7 +139,12 @@ def preview():
     )
 
     res = requests.get(query_url, headers=HEADERS)
-    data = res.json() if res.status_code == 200 else []
+    if res.status_code == 200:
+        data = res.json()
+    else:
+        print("ERROR: Failed to fetch preview data:", res.status_code, res.text)
+        data = []
+
     return render_template("preview.html", tasks=data, datadate=selected_date, name=selected_name)
 
 @app.route("/preview_api")
@@ -166,6 +176,9 @@ def preview_api():
         rows = res.json()
         for r in rows:
             total += float(r.get("hours", 0))
+    else:
+        print("ERROR: Failed to fetch monthly hours:", res.status_code, res.text)
+
     return jsonify({"monthly_hours": total})
 
 if __name__ == "__main__":

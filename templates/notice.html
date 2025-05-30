@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>お知らせ</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 1.5em;
+            margin: 0;
+            background-color: #f7f7f7;
+        }
+
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: #fff;
+            padding: 2em;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 1em;
+            font-size: 1.5em;
+        }
+
+        .notice-box {
+            background-color: #fff9e6;
+            border-left: 6px solid #ffc107;
+            padding: 1em;
+            margin-bottom: 1.5em;
+            font-size: 1em;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 1em;
+            font-size: 0.95em;
+        }
+
+        .btn {
+            display: inline-block;
+            width: 100%;
+            background-color: #007bff;
+            color: white;
+            text-align: center;
+            padding: 0.75em;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 1em;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 1.2em;
+            }
+
+            .btn {
+                font-size: 0.95em;
+                padding: 0.7em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>お知らせ</h1>
+        <div class="notice-box">
+            <p>
+                5月の目標は「毎日こまめに記録する」ことです。<br>
+                勤怠報告と併せて、日報の記入も忘れずに行いましょう。
+            </p>
+        </div>
+
+        <form method="POST" action="{{ url_for('acknowledge_notice') }}">
+            <label>
+                <input type="checkbox" id="confirm" name="confirm">
+                上記のお知らせを確認しました
+            </label>
+            <button type="submit" class="btn" id="submitBtn" disabled>日報入力ページへ進む</button>
+        </form>
+    </div>
+
+    <script>
+        const checkbox = document.getElementById("confirm");
+        const button = document.getElementById("submitBtn");
+        checkbox.addEventListener("change", () => {
+            button.disabled = !checkbox.checked;
+        });
+    </script>
+</body>
+</html>
