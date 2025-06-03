@@ -1,196 +1,250 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <title>日報入力フォーム</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <meta charset="UTF-8">
+  <title>日報入力フォーム</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body class="bg-light">
 <div class="container py-4">
-    <div class="card">
-        <div class="card-body">
-            <h4 class="mb-4">日報入力フォーム</h4>
+  <div class="card">
+    <div class="card-body">
+      <h4 class="mb-4">日報入力フォーム</h4>
 
-            <form id="reportForm">
-                <div class="mb-3">
-                    <label for="date" class="form-label">日付</label>
-                    <input type="date" class="form-control" id="date" name="date" required>
-                </div>
+      {% if role in ["Manager", "Admin"] %}
+      <div class="mb-3 text-end">
+        <a href="{{ url_for('graph') }}" class="btn btn-outline-success">📊 グラフ表示ページへ</a>
+      </div>
+      {% endif %}
 
-                <div class="mb-3">
-                    <label for="name" class="form-label">氏名</label>
-                    <select class="form-select" id="name" name="name" required>
-                        <option value="">選択してください</option>
-                        {% for n in names %}
-                        <option value="{{n}}">{{n}}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <div id="task-rows">
-                    <div class="row g-2 mb-2 task-row">
-                        <div class="col-12 col-md-3">
-                            <select class="form-select category-select" name="category">
-                                {% for c in category_map %}
-                                <option value="{{c}}">{{c}}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-12 col-md-3">
-                            <select class="form-select detail-select" name="detail">
-                                {% for d in category_map[category_map|list|first] %}
-                                <option value="{{d}}">{{d}}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-6 col-md-2">
-                            <select class="form-select" name="hours">
-                                {% for i in range(1, 33) %}
-                                <option value="{{ i * 0.25 }}">{{ i * 0.25 }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="col-6 col-md-3">
-                            <input type="text" class="form-control" name="comment" placeholder="コメント">
-                        </div>
-                        <div class="col-12 col-md-1 d-flex align-items-center">
-                            <button type="button" class="btn btn-link text-danger remove-task">削除</button>
-                        </div>
-                    </div>
-                </div>
-
-                <button type="button" class="btn btn-outline-primary mb-3" id="addRow">＋行を追加</button>
-
-                <div class="mb-3">
-                    <p>今月の合計時間：<span id="monthlyHours">-</span></p>
-                    <p>当日の入力時間：<span id="dailyHours">0.00</span> 時間</p>
-                </div>
-
-                <div class="d-flex flex-wrap gap-2">
-                    <button type="submit" class="btn btn-primary">送信</button>
-                    <button type="button" class="btn btn-secondary" id="previewButton">入力内容確認</button>
-                    <a href="/master" class="btn btn-link">マスターを確認</a>
-                </div>
-            </form>
-
+      <form id="reportForm">
+        <div class="mb-3">
+          <label for="date" class="form-label">日付</label>
+          <input type="date" class="form-control" id="date" name="date" required>
         </div>
+
+        <div class="mb-3">
+          <label for="name" class="form-label">氏名</label>
+          {% if role == 'User' %}
+          <input type="text" class="form-control" id="name" name="name" value="{{ session['name'] }}" readonly>
+          {% else %}
+          <select class="form-select" id="name" name="name" required>
+            <option value="">選択してください</option>
+            {% for n in names %}
+            <option value="{{n}}">{{n}}</option>
+            {% endfor %}
+          </select>
+          {% endif %}
+        </div>
+
+        <div id="task-rows"></div>
+
+        <div id="task-template" class="row g-2 mb-2 task-row d-none">
+          <div class="col-md-3">
+            <select class="form-select category-select" name="category">
+              {% for c in category_map %}
+              <option value="{{c}}">{{c}}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-3">
+            <select class="form-select detail-select" name="detail">
+              {% for d in category_map[category_map|list|first] %}
+              <option value="{{d}}">{{d}}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-2">
+            <select class="form-select" name="hours">
+              {% for i in range(1, 33) %}
+              <option value="{{ i * 0.25 }}">{{ i * 0.25 }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-3">
+            <input type="text" class="form-control" name="comment" placeholder="コメント">
+          </div>
+          <div class="col-md-1 d-flex align-items-center">
+            <button type="button" class="btn btn-link text-danger remove-task">削除</button>
+          </div>
+        </div>
+
+        <button type="button" class="btn btn-outline-primary mb-3" id="addRow">＋行を追加</button>
+
+        <div class="mb-3">
+          <p>今月の合計時間：<span id="monthlyHours">-</span></p>
+          <p>当日の入力時間：<span id="dailyHours">0.00</span> 時間</p>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2">
+          <button type="submit" class="btn btn-primary">送信</button>
+          <button type="button" class="btn btn-secondary" id="previewButton">入力内容確認</button>
+          <button type="button" class="btn btn-outline-success" id="saveDraft">💾 一時保存</button>
+          <button type="button" class="btn btn-outline-warning" id="loadDraft">📤 下書き読込</button>
+          <a href="/master" class="btn btn-link">マスターを確認</a>
+        </div>
+      </form>
     </div>
+  </div>
 </div>
 
 <script>
-    const categoryMap = {{ category_map | tojson }};
+const categoryMap = {{ category_map | tojson }};
+const mustResetPassword = {{ must_reset_password | tojson }};
+if (mustResetPassword === true) {
+  window.location.href = "/reset_password";
+}
 
-    function updateDetailOptions(row) {
-        const category = row.querySelector(".category-select").value;
-        const detailSelect = row.querySelector(".detail-select");
-        detailSelect.innerHTML = "";
-        (categoryMap[category] || []).forEach(d => {
-            const opt = document.createElement("option");
-            opt.value = d;
-            opt.textContent = d;
-            detailSelect.appendChild(opt);
-        });
-    }
+function updateDetailOptions(row) {
+  const category = row.querySelector("select[name='category']").value;
+  const detailSelect = row.querySelector("select[name='detail']");
+  detailSelect.innerHTML = "";
+  (categoryMap[category] || []).forEach(d => {
+    const opt = document.createElement("option");
+    opt.value = d;
+    opt.textContent = d;
+    detailSelect.appendChild(opt);
+  });
+}
 
-    function updateTotalHours() {
-        const taskRows = document.querySelectorAll(".task-row");
-        let total = 0;
-        taskRows.forEach(row => {
-            const val = parseFloat(row.querySelector("select[name='hours']").value);
-            total += isNaN(val) ? 0 : val;
-        });
-        document.getElementById("dailyHours").textContent = total.toFixed(2);
-    }
+function updateTotalHours() {
+  let total = 0;
+  document.querySelectorAll(".task-row").forEach(row => {
+    const val = parseFloat(row.querySelector("select[name='hours']").value);
+    total += isNaN(val) ? 0 : val;
+  });
+  document.getElementById("dailyHours").textContent = total.toFixed(2);
+}
 
-    async function fetchMonthlyHours() {
-        const date = document.getElementById("date").value;
-        const name = document.getElementById("name").value;
-        if (!date || !name) return;
-        const url = `/preview_api?date=${encodeURIComponent(date)}&name=${encodeURIComponent(name)}`;
-        const res = await fetch(url);
-        const result = await res.json();
-        if (res.ok && result.monthly_hours !== undefined) {
-            document.getElementById("monthlyHours").textContent = result.monthly_hours.toFixed(2) + " 時間";
-        }
-    }
+function createTaskRow(task = null) {
+  const template = document.getElementById("task-template");
+  const newRow = template.cloneNode(true);
+  newRow.id = "";
+  newRow.classList.remove("d-none");
 
-    document.getElementById("addRow").addEventListener("click", () => {
-        const row = document.querySelector(".task-row");
-        const newRow = row.cloneNode(true);
-        newRow.querySelectorAll("select").forEach(s => s.selectedIndex = 0);
-        newRow.querySelector("input[name='comment']").value = "";
-        newRow.querySelector(".remove-task").addEventListener("click", () => {
-            newRow.remove();
-            updateTotalHours();
-        });
-        newRow.querySelector(".category-select").addEventListener("change", () => {
-            updateDetailOptions(newRow);
-        });
-        newRow.querySelector("select[name='hours']").addEventListener("change", updateTotalHours);
-        document.getElementById("task-rows").appendChild(newRow);
+  const category = newRow.querySelector("select[name='category']");
+  const detail = newRow.querySelector("select[name='detail']");
+  const hours = newRow.querySelector("select[name='hours']");
+  const comment = newRow.querySelector("input[name='comment']");
+
+  if (task) {
+    category.value = task.category;
+    updateDetailOptions(newRow);
+    detail.value = task.detail;
+    hours.value = task.hours;
+    comment.value = task.comment;
+  } else {
+    category.selectedIndex = 0;
+    updateDetailOptions(newRow);
+    detail.selectedIndex = 0;
+    hours.selectedIndex = 0;
+    comment.value = "";
+  }
+
+  category.addEventListener("change", () => updateDetailOptions(newRow));
+  hours.addEventListener("change", updateTotalHours);
+  newRow.querySelector(".remove-task").addEventListener("click", () => {
+    newRow.remove(); updateTotalHours();
+  });
+
+  return newRow;
+}
+
+document.getElementById("addRow").addEventListener("click", () => {
+  const row = createTaskRow();
+  document.getElementById("task-rows").appendChild(row);
+});
+
+document.getElementById("saveDraft").addEventListener("click", async () => {
+  const date = document.getElementById("date").value;
+  const taskRows = document.querySelectorAll(".task-row");
+  const tasks = Array.from(taskRows).map(row => ({
+    category: row.querySelector("select[name='category']").value,
+    detail: row.querySelector("select[name='detail']").value,
+    hours: row.querySelector("select[name='hours']").value,
+    comment: row.querySelector("input[name='comment']").value
+  }));
+
+  // 先に存在確認
+  const check = await fetch(`/load_draft?date=${date}`);
+  const existing = await check.json();
+  if (existing.tasks.length > 0) {
+    if (!confirm("既に下書きが存在します。上書きしてもよいですか？")) return;
+  }
+
+  const res = await fetch("/save_draft", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({date, tasks})
+  });
+  const result = await res.json();
+  alert(result.message || "一時保存に失敗しました");
+});
+
+document.getElementById("loadDraft").addEventListener("click", async () => {
+  const date = document.getElementById("date").value;
+  if (!date) return alert("先に日付を選択してください");
+
+  const res = await fetch(`/load_draft?date=${date}`);
+  const result = await res.json();
+
+  if (res.ok && result.tasks && result.tasks.length > 0) {
+    const container = document.getElementById("task-rows");
+    container.innerHTML = "";
+    result.tasks.forEach(task => {
+      const row = createTaskRow(task);
+      container.appendChild(row);
     });
+    updateTotalHours();
+    alert("下書きを読み込みました");
+  } else {
+    alert("下書きが存在しません");
+  }
+});
 
-    document.querySelectorAll(".remove-task").forEach(btn => {
-        btn.addEventListener("click", () => {
-            btn.closest(".task-row").remove();
-            updateTotalHours();
-        });
-    });
+document.getElementById("reportForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const date = document.getElementById("date").value;
+  const name = document.getElementById("name").value;
+  const taskRows = document.querySelectorAll(".task-row");
+  const tasks = Array.from(taskRows).map(row => ({
+    category: row.querySelector("select[name='category']").value,
+    detail: row.querySelector("select[name='detail']").value,
+    hours: row.querySelector("select[name='hours']").value,
+    comment: row.querySelector("input[name='comment']").value
+  }));
+  const res = await fetch("/submit", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({date, name, tasks})
+  });
+  const result = await res.json();
+  alert(res.ok ? result.message : "送信失敗: " + result.message);
+});
 
-    document.querySelectorAll(".category-select").forEach(sel => {
-        sel.addEventListener("change", () => {
-            updateDetailOptions(sel.closest(".task-row"));
-        });
-    });
+document.getElementById("previewButton").addEventListener("click", () => {
+  const date = document.getElementById("date").value;
+  const name = document.getElementById("name").value;
+  if (!date || !name) {
+    alert("日付と氏名を選択してください");
+    return;
+  }
+  window.open(`/preview?date=${date}&name=${name}`, "_blank", "width=800,height=600");
+});
 
-    document.querySelectorAll("select[name='hours']").forEach(sel => {
-        sel.addEventListener("change", updateTotalHours);
-    });
+document.getElementById("date").addEventListener("change", async () => {
+  const date = document.getElementById("date").value;
+  const name = document.getElementById("name").value;
+  if (!date || !name) return;
+  const res = await fetch(`/preview_api?date=${date}&name=${name}`);
+  const result = await res.json();
+  document.getElementById("monthlyHours").textContent = result.monthly_hours?.toFixed(2) + " 時間";
+});
 
-    document.getElementById("date").addEventListener("change", fetchMonthlyHours);
-    document.getElementById("name").addEventListener("change", fetchMonthlyHours);
-
-    document.getElementById("reportForm").addEventListener("submit", async (e) => {
-        e.preventDefault();
-
-        const date = document.getElementById("date").value;
-        const name = document.getElementById("name").value;
-        const taskRows = document.querySelectorAll(".task-row");
-
-        const tasks = Array.from(taskRows).map(row => ({
-            category: row.querySelector("select[name='category']").value,
-            detail: row.querySelector("select[name='detail']").value,
-            hours: row.querySelector("select[name='hours']").value,
-            comment: row.querySelector("input[name='comment']").value
-        }));
-
-        const res = await fetch("/submit", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ date, name, tasks })
-        });
-
-        const result = await res.json();
-        if (res.ok) {
-            alert(result.message);
-        } else {
-            alert("送信失敗: " + result.message);
-        }
-    });
-
-    document.getElementById("previewButton").addEventListener("click", () => {
-        const date = document.getElementById("date").value;
-        const name = document.getElementById("name").value;
-        if (!date || !name) {
-            alert("日付と氏名を選択してください");
-            return;
-        }
-        const url = `/preview?date=${encodeURIComponent(date)}&name=${encodeURIComponent(name)}`;
-        window.open(url, "_blank", "width=800,height=600");
-    });
+document.getElementById("name").addEventListener("change", () => {
+  document.getElementById("date").dispatchEvent(new Event("change"));
+});
 </script>
 </body>
 </html>
