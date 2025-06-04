@@ -23,42 +23,58 @@
 <body class="bg-light">
 <div class="container mt-4">
     <h4 class="mb-4">📊 月次グラフ分析</h4>
-    <div class="row mb-3">
-        <div class="col-md-3">
-            <label for="month" class="form-label">対象月</label>
-            <input type="month" id="month" class="form-control">
-        </div>
-        <div class="col-md-4">
-            <label for="name" class="form-label">氏名（空欄で全員）</label>
-            <select id="name" class="form-select">
-                <option value="">--全員--</option>
-                {% for n in names %}
-                    <option value="{{n}}">{{n}}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-md-5 d-flex align-items-end">
-            <button id="fetchBtn" class="btn btn-primary w-100">表示</button>
-        </div>
-    </div>
-    <div id="graph-title" class="fw-bold mb-2"></div>
-    <div id="no-data" class="text-danger"></div>
-    <div class="chart-container">
-        <div id="pieChart" class="chart-box"></div>
-        <div id="barChart" class="chart-box"></div>
+    <div id="graph-section"></div>
+    <div class="text-center mt-4">
+        <button id="addGraph" class="btn btn-outline-primary">＋ グラフ追加</button>
     </div>
 </div>
 
 <script>
-    document.getElementById("fetchBtn").addEventListener("click", async () => {
-        const monthInput = document.getElementById("month").value;
-        const name = document.getElementById("name").value;
-        const titleDiv = document.getElementById("graph-title");
-        const noDataDiv = document.getElementById("no-data");
-        const pieDiv = document.getElementById("pieChart");
-        const barDiv = document.getElementById("barChart");
+    const names = [{% for n in names %}"{{n}}",{% endfor %}];
+
+    function createGraphBlock(index) {
+        const wrapper = document.createElement("div");
+        wrapper.className = "mb-5 p-3 bg-white rounded shadow-sm";
+
+        const idSuffix = `_${index}`;
+        wrapper.innerHTML = `
+            <div class="row mb-3">
+                <div class="col-md-3">
+                    <label for="month${idSuffix}" class="form-label">対象月</label>
+                    <input type="month" id="month${idSuffix}" class="form-control">
+                </div>
+                <div class="col-md-4">
+                    <label for="name${idSuffix}" class="form-label">氏名</label>
+                    <select id="name${idSuffix}" class="form-select">
+                        ${names.map(n => `<option value="${n}">${n}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="col-md-5 d-flex align-items-end">
+                    <button class="btn btn-primary w-100" onclick="fetchGraph('${idSuffix}')">表示</button>
+                </div>
+            </div>
+            <div id="graph-title${idSuffix}" class="fw-bold mb-2"></div>
+            <div id="total-hours${idSuffix}" class="mb-2 text-muted"></div>
+            <div id="no-data${idSuffix}" class="text-danger"></div>
+            <div class="chart-container">
+                <div id="pieChart${idSuffix}" class="chart-box"></div>
+                <div id="barChart${idSuffix}" class="chart-box"></div>
+            </div>
+        `;
+        document.getElementById("graph-section").appendChild(wrapper);
+    }
+
+    function fetchGraph(idSuffix) {
+        const monthInput = document.getElementById(`month${idSuffix}`).value;
+        const name = document.getElementById(`name${idSuffix}`).value;
+        const titleDiv = document.getElementById(`graph-title${idSuffix}`);
+        const totalDiv = document.getElementById(`total-hours${idSuffix}`);
+        const noDataDiv = document.getElementById(`no-data${idSuffix}`);
+        const pieDiv = document.getElementById(`pieChart${idSuffix}`);
+        const barDiv = document.getElementById(`barChart${idSuffix}`);
 
         titleDiv.textContent = "";
+        totalDiv.textContent = "";
         noDataDiv.textContent = "";
         pieDiv.innerHTML = "";
         barDiv.innerHTML = "";
@@ -69,50 +85,71 @@
         }
 
         const [year, month] = monthInput.split("-");
-        const res = await fetch(`/graph_data?year=${year}&month=${month}&name=${encodeURIComponent(name)}`);
-        const data = await res.json();
+        fetch(`/graph_data?year=${year}&month=${month}&name=${encodeURIComponent(name)}`)
+            .then(res => res.json())
+            .then(data => {
+                if (!Array.isArray(data) || data.length === 0) {
+                    noDataDiv.textContent = "該当データがありません";
+                    return;
+                }
 
-        if (!Array.isArray(data) || data.length === 0) {
-            noDataDiv.textContent = "該当データがありません";
-            return;
-        }
+                const categoryMap = {};
+                let total = 0;
+                data.forEach(row => {
+                    const cat = row.category;
+                    const hrs = parseFloat(row.hours || 0);
+                    categoryMap[cat] = (categoryMap[cat] || 0) + hrs;
+                    total += hrs;
+                });
 
-        const categoryMap = {};
-        let total = 0;
-        data.forEach(row => {
-            const cat = row.category;
-            const hrs = parseFloat(row.hours || 0);
-            categoryMap[cat] = (categoryMap[cat] || 0) + hrs;
-            total += hrs;
-        });
+                const labels = Object.keys(categoryMap);
+                const values = labels.map(k => categoryMap[k]);
+                titleDiv.textContent = `${name} の稼働内訳`;
+                totalDiv.textContent = `合計稼働時間：${total.toFixed(2)} 時間`;
 
-        const labels = Object.keys(categoryMap);
-        const values = labels.map(k => categoryMap[k]);
-        titleDiv.textContent = `${name || '全員'} の稼働内訳`;
+                Plotly.newPlot(`pieChart${idSuffix}`, [{
+                    type: "pie",
+                    labels: labels,
+                    values: values,
+                    hole: 0.4,
+                    textinfo: "percent",
+                    textposition: "inside",
+                    textfont: { size: 12 },
+                    automargin: true
+                }], {
+                    title: "月次稼働時間 円グラフ",
+                    height: 500,
+                    width: 500,
+                    margin: { t: 40, l: 20, r: 20, b: 120 },
+                    showlegend: true,
+                    legend: {
+                        orientation: "h",
+                        y: -0.3,
+                        x: 0.5,
+                        xanchor: "center"
+                    }
+                });
 
-        Plotly.newPlot("pieChart", [{
-            type: "pie",
-            labels: labels,
-            values: values,
-            textinfo: "label+percent",
-            textposition: "outside",
-            automargin: true
-        }], {
-            title: "円グラフ",
-            margin: { t: 30, l: 30, r: 30, b: 30 },
-            height: 400
-        });
+                Plotly.newPlot(`barChart${idSuffix}`, [{
+                    type: "bar",
+                    x: values,
+                    y: labels,
+                    orientation: "h"
+                }], {
+                    title: "月次稼働時間 棒グラフ",
+                    margin: { t: 30, l: 120, r: 30, b: 30 },
+                    height: 500
+                });
+            });
+    }
 
-        Plotly.newPlot("barChart", [{
-            type: "bar",
-            x: values,
-            y: labels,
-            orientation: "h"
-        }], {
-            title: "横棒グラフ",
-            margin: { t: 30, l: 100, r: 30, b: 30 },
-            height: 400
-        });
+    window.addEventListener("DOMContentLoaded", () => {
+        createGraphBlock(0);
+    });
+
+    let graphIndex = 1;
+    document.getElementById("addGraph").addEventListener("click", () => {
+        createGraphBlock(graphIndex++);
     });
 </script>
 </body>

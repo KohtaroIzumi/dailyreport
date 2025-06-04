@@ -56,8 +56,8 @@ def login():
                     "must_reset_password": user['must_reset_password']
                 })
                 return redirect(url_for("reset_password" if user['must_reset_password'] else "index"))
-            return render_template("login.html", error="パスワードが間違っています")
-        return render_template("login.html", error="社員番号が見つかりません")
+            return render_template("login.html", error="入力内容に誤りがあります")
+        return render_template("login.html", error="入力内容に誤りがあります")
     return render_template("login.html")
 
 @app.route("/logout")
