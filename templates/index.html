@@ -11,31 +11,14 @@
   <div class="card">
     <div class="card-body">
       <h4 class="mb-4">日報入力フォーム</h4>
-
-      {% if role in ["Manager", "Admin"] %}
-      <div class="mb-3 text-end">
-        <a href="{{ url_for('graph') }}" class="btn btn-outline-success">📊 グラフ表示ページへ</a>
-      </div>
-      {% endif %}
-
       <form id="reportForm">
         <div class="mb-3">
           <label for="date" class="form-label">日付</label>
           <input type="date" class="form-control" id="date" name="date" required>
         </div>
-
         <div class="mb-3">
           <label for="name" class="form-label">氏名</label>
-          {% if role == 'User' %}
           <input type="text" class="form-control" id="name" name="name" value="{{ session['name'] }}" readonly>
-          {% else %}
-          <select class="form-select" id="name" name="name" required>
-            <option value="">選択してください</option>
-            {% for n in names %}
-            <option value="{{n}}">{{n}}</option>
-            {% endfor %}
-          </select>
-          {% endif %}
         </div>
 
         <div class="row fw-bold">
@@ -47,17 +30,16 @@
         </div>
 
         <div id="task-rows"></div>
-
         <div id="task-template" class="row g-2 mb-2 task-row d-none">
           <div class="col-md-3">
-            <select class="form-select category-select" name="category">
+            <select class="form-select" name="category">
               {% for c in category_map %}
               <option value="{{c}}">{{c}}</option>
               {% endfor %}
             </select>
           </div>
           <div class="col-md-3">
-            <select class="form-select detail-select" name="detail">
+            <select class="form-select" name="detail">
               {% for d in category_map[category_map|list|first] %}
               <option value="{{d}}">{{d}}</option>
               {% endfor %}
@@ -100,6 +82,9 @@
 <script>
 const categoryMap = {{ category_map | tojson }};
 const mustResetPassword = {{ must_reset_password | tojson }};
+if (mustResetPassword === true) {
+  window.location.href = "/reset_password";
+}
 
 function updateDetailOptions(row) {
   const category = row.querySelector("select[name='category']").value;
@@ -116,17 +101,19 @@ function updateDetailOptions(row) {
 function updateTotalHours() {
   let total = 0;
   document.querySelectorAll(".task-row").forEach(row => {
+    if (row.dataset.initial === "true") return;
     const val = parseFloat(row.querySelector("select[name='hours']").value);
     total += isNaN(val) ? 0 : val;
   });
   document.getElementById("dailyHours").textContent = total.toFixed(2);
 }
 
-function createTaskRow(task = null) {
+function createTaskRow(task = null, isInitial = false) {
   const template = document.getElementById("task-template");
   const newRow = template.cloneNode(true);
   newRow.id = "";
   newRow.classList.remove("d-none");
+  if (isInitial) newRow.dataset.initial = "true";
 
   const category = newRow.querySelector("select[name='category']");
   const detail = newRow.querySelector("select[name='detail']");
@@ -143,46 +130,35 @@ function createTaskRow(task = null) {
     category.selectedIndex = 0;
     updateDetailOptions(newRow);
     detail.selectedIndex = 0;
-    hours.selectedIndex = 0;
+    hours.value = "0.25";
     comment.value = "";
   }
 
   category.addEventListener("change", () => updateDetailOptions(newRow));
   hours.addEventListener("change", updateTotalHours);
   newRow.querySelector(".remove-task").addEventListener("click", () => {
-    newRow.remove(); updateTotalHours();
+    newRow.remove();
+    updateTotalHours();
   });
 
   return newRow;
 }
 
-window.addEventListener("DOMContentLoaded", () => {
-  const row = createTaskRow();
-  document.getElementById("task-rows").appendChild(row);
-  const today = new Date().toISOString().split("T")[0];
-  document.getElementById("date").value = today;
-});
-
 document.getElementById("addRow").addEventListener("click", () => {
   const row = createTaskRow();
   document.getElementById("task-rows").appendChild(row);
+  updateTotalHours();
 });
 
 document.getElementById("saveDraft").addEventListener("click", async () => {
   const date = document.getElementById("date").value;
   const taskRows = document.querySelectorAll(".task-row");
-  const tasks = Array.from(taskRows).map(row => ({
+  const tasks = Array.from(taskRows).filter(row => row.dataset.initial !== "true").map(row => ({
     category: row.querySelector("select[name='category']").value,
     detail: row.querySelector("select[name='detail']").value,
     hours: row.querySelector("select[name='hours']").value,
     comment: row.querySelector("input[name='comment']").value
   }));
-
-  const check = await fetch(`/load_draft?date=${date}`);
-  const existing = await check.json();
-  if (existing.tasks.length > 0) {
-    if (!confirm("既に下書きが存在します。上書きしてもよいですか？")) return;
-  }
 
   const res = await fetch("/save_draft", {
     method: "POST",
@@ -196,30 +172,16 @@ document.getElementById("saveDraft").addEventListener("click", async () => {
 document.getElementById("loadDraft").addEventListener("click", async () => {
   const date = document.getElementById("date").value;
   if (!date) return alert("先に日付を選択してください");
-
   const res = await fetch(`/load_draft?date=${date}`);
   const result = await res.json();
-
-  if (res.ok && result.tasks && result.tasks.length > 0) {
-    const container = document.getElementById("task-rows");
-    container.innerHTML = "";
-    result.tasks.forEach(task => {
-      if (
-        task.category === "営業" &&
-        task.detail === "企業リスト収集" &&
-        parseFloat(task.hours) === 0.25 &&
-        (!task.comment || task.comment.trim() === "")
-      ) {
-        return; // 初期行条件に合致するものはスキップ
-      }
-      const row = createTaskRow(task);
-      container.appendChild(row);
-    });
-    updateTotalHours();
-    alert("下書きを読み込みました");
-  } else {
-    alert("下書きが存在しません");
-  }
+  const container = document.getElementById("task-rows");
+  container.innerHTML = "";
+  (result.tasks || []).forEach(task => {
+    const row = createTaskRow(task);
+    container.appendChild(row);
+  });
+  updateTotalHours();
+  alert("下書きを読み込みました");
 });
 
 document.getElementById("reportForm").addEventListener("submit", async (e) => {
@@ -227,12 +189,13 @@ document.getElementById("reportForm").addEventListener("submit", async (e) => {
   const date = document.getElementById("date").value;
   const name = document.getElementById("name").value;
   const taskRows = document.querySelectorAll(".task-row");
-  const tasks = Array.from(taskRows).map(row => ({
+  const tasks = Array.from(taskRows).filter(row => row.dataset.initial !== "true").map(row => ({
     category: row.querySelector("select[name='category']").value,
     detail: row.querySelector("select[name='detail']").value,
     hours: row.querySelector("select[name='hours']").value,
     comment: row.querySelector("input[name='comment']").value
   }));
+
   const res = await fetch("/submit", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
@@ -249,7 +212,7 @@ document.getElementById("previewButton").addEventListener("click", () => {
     alert("日付と氏名を選択してください");
     return;
   }
-  window.open(`/preview?date=${date}&name=${name}`, "_blank", "width=800,height=600");
+  window.open(`/preview?date=${date}&name=${name}`, "_blank");
 });
 
 document.getElementById("date").addEventListener("change", async () => {
@@ -261,8 +224,11 @@ document.getElementById("date").addEventListener("change", async () => {
   document.getElementById("monthlyHours").textContent = result.monthly_hours?.toFixed(2) + " 時間";
 });
 
-document.getElementById("name").addEventListener("change", () => {
-  document.getElementById("date").dispatchEvent(new Event("change"));
+window.addEventListener("DOMContentLoaded", () => {
+  const today = new Date().toISOString().split("T")[0];
+  document.getElementById("date").value = today;
+  document.getElementById("task-rows").appendChild(createTaskRow(null, true));
+  updateTotalHours();
 });
 </script>
 </body>
