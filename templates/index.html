@@ -38,6 +38,14 @@
           {% endif %}
         </div>
 
+        <div class="row fw-bold">
+          <div class="col-md-3">項目</div>
+          <div class="col-md-3">詳細</div>
+          <div class="col-md-2">時間</div>
+          <div class="col-md-3">コメント</div>
+          <div class="col-md-1"></div>
+        </div>
+
         <div id="task-rows"></div>
 
         <div id="task-template" class="row g-2 mb-2 task-row d-none">
@@ -92,9 +100,6 @@
 <script>
 const categoryMap = {{ category_map | tojson }};
 const mustResetPassword = {{ must_reset_password | tojson }};
-if (mustResetPassword === true) {
-  window.location.href = "/reset_password";
-}
 
 function updateDetailOptions(row) {
   const category = row.querySelector("select[name='category']").value;
@@ -151,6 +156,13 @@ function createTaskRow(task = null) {
   return newRow;
 }
 
+window.addEventListener("DOMContentLoaded", () => {
+  const row = createTaskRow();
+  document.getElementById("task-rows").appendChild(row);
+  const today = new Date().toISOString().split("T")[0];
+  document.getElementById("date").value = today;
+});
+
 document.getElementById("addRow").addEventListener("click", () => {
   const row = createTaskRow();
   document.getElementById("task-rows").appendChild(row);
@@ -166,7 +178,6 @@ document.getElementById("saveDraft").addEventListener("click", async () => {
     comment: row.querySelector("input[name='comment']").value
   }));
 
-  // 先に存在確認
   const check = await fetch(`/load_draft?date=${date}`);
   const existing = await check.json();
   if (existing.tasks.length > 0) {
@@ -193,6 +204,14 @@ document.getElementById("loadDraft").addEventListener("click", async () => {
     const container = document.getElementById("task-rows");
     container.innerHTML = "";
     result.tasks.forEach(task => {
+      if (
+        task.category === "営業" &&
+        task.detail === "企業リスト収集" &&
+        parseFloat(task.hours) === 0.25 &&
+        (!task.comment || task.comment.trim() === "")
+      ) {
+        return; // 初期行条件に合致するものはスキップ
+      }
       const row = createTaskRow(task);
       container.appendChild(row);
     });
