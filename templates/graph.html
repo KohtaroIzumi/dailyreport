@@ -32,11 +32,6 @@
 <script>
 let graphIndex = 0;
 
-function wrapLabel(label, maxChars = 10) {
-  if (label.length <= maxChars) return label;
-  return label.replace(new RegExp(`(.{1,${maxChars}})(\s|$)`, 'g'), '$1<br>').trim();
-}
-
 function createGraphBlock(index, names) {
   const wrapper = document.createElement("div");
   wrapper.className = "mb-5 p-3 bg-white rounded shadow-sm";
@@ -85,7 +80,7 @@ function fetchGraph(idSuffix) {
   barDiv.innerHTML = "";
 
   if (!monthInput) {
-    noDataDiv.textContent = "🗓 対象月を選択してください";
+    noDataDiv.textContent = "📅 対象月を選択してください";
     return;
   }
 
@@ -111,10 +106,9 @@ function fetchGraph(idSuffix) {
 
       const labels = Object.keys(categoryMap);
       const values = labels.map(k => categoryMap[k]);
-      const wrappedLabels = labels.map(label => wrapLabel(label, 10));
 
-      titleDiv.textContent = `${name} の稼動内訳`;
-      totalDiv.textContent = `合計稼動時間：${total.toFixed(2)} 時間`;
+      titleDiv.textContent = `${name} の稼働内訳`;
+      totalDiv.textContent = `合計稼働時間：${total.toFixed(2)} 時間`;
 
       Plotly.newPlot(`pieChart${idSuffix}`, [{
         type: "pie",
@@ -127,11 +121,17 @@ function fetchGraph(idSuffix) {
         textfont: { size: 14 },
         marker: { line: { width: 1, color: "#fff" } }
       }], {
-        height: 680,
-        width: 680,
+        height: 700,
+        width: 700,
         margin: { t: 30, b: 60, l: 30, r: 30 },
+        automargin: true,
         showlegend: true,
-        legend: { orientation: "h", x: 0.5, xanchor: "center", y: -0.05 },
+        legend: {
+          orientation: "h",
+          x: 0.5,
+          xanchor: "center",
+          y: -0.05
+        },
         annotations: [{
           text: labelMonth,
           font: { size: 20 },
@@ -139,16 +139,23 @@ function fetchGraph(idSuffix) {
           x: 0.5,
           y: 0.5
         }],
+        hoverlabel: {
+          align: "left",
+          bgcolor: "#fff",
+          bordercolor: "#ccc",
+          font: { color: "#000", size: 12 }
+        },
+        cliponaxis: false
       });
 
       Plotly.newPlot(`barChart${idSuffix}`, [{
         type: "bar",
         x: values,
-        y: wrappedLabels,
+        y: labels.map(label => label.length > 8 ? label.replace(/(.{8})/g, "$1<br>") : label),
         orientation: "h"
       }], {
-        title: "月次稼動時間 棒グラフ",
-        margin: { t: 30, l: 180, r: 30, b: 30 },
+        title: "月次稼働時間 棒グラフ",
+        margin: { t: 30, l: 150, r: 30, b: 30 },
         height: 700
       });
     });
@@ -157,7 +164,9 @@ function fetchGraph(idSuffix) {
 async function initializeGraphPage() {
   const res = await fetch("/api/names");
   const names = await res.json();
+
   createGraphBlock(graphIndex++, names);
+
   document.getElementById("addGraph").addEventListener("click", () => {
     createGraphBlock(graphIndex++, names);
   });
