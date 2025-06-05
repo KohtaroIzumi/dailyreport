@@ -188,6 +188,11 @@ document.getElementById("previewButton").addEventListener("click", () => {
 
 document.getElementById("saveDraft").addEventListener("click", async () => {
   const date = document.getElementById("date").value;
+  const name = document.getElementById("name").value;
+  if (!name) {
+    alert("氏名を選択してください");
+    return;
+  }
   const taskRows = document.querySelectorAll(".task-row");
   const tasks = Array.from(taskRows).map(row => ({
     category: row.querySelector("select[name='category']").value,
@@ -213,10 +218,13 @@ document.getElementById("loadDraft").addEventListener("click", async () => {
 
   const container = document.getElementById("task-rows");
   container.innerHTML = "";
-  (result.tasks || []).forEach(task => {
-    const row = createTaskRow(task);
-    container.appendChild(row);
-  });
+  (result.tasks || [])
+    .filter(task => task.hours !== "0.00")
+    .forEach(task => {
+      const row = createTaskRow(task);
+      container.appendChild(row);
+    });
+
   updateTotalHours();
   alert("下書きを読み込みました");
 });
