@@ -238,9 +238,7 @@ def preview_api():
 @login_required
 @role_required(["Manager", "Admin"])
 def graph():
-    res = requests.get(f"{SUPABASE_URL}/rest/v1/master_name?select=name", headers=HEADERS)
-    names = [r["name"] for r in res.json()] if res.status_code == 200 else []
-    return render_template("graph.html", names=names)
+    return render_template("graph.html")
 
 @app.route("/graph_data")
 @login_required
@@ -261,6 +259,13 @@ def graph_data():
     url = f"{SUPABASE_URL}/rest/v1/daily_report?{'&'.join(filters)}"
     res = requests.get(url, headers=HEADERS)
     return jsonify(res.json()) if res.status_code == 200 else jsonify([])
+
+@app.route("/api/names")
+@login_required
+@role_required(["Manager", "Admin"])
+def api_names():
+    res = requests.get(f"{SUPABASE_URL}/rest/v1/master_name?select=name", headers=HEADERS)
+    return jsonify([r["name"] for r in res.json()]) if res.status_code == 200 else jsonify([])
 
 if __name__ == "__main__":
     app.run(debug=True)

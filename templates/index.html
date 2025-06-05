@@ -11,14 +11,23 @@
   <div class="card">
     <div class="card-body">
       <h4 class="mb-4">日報入力フォーム</h4>
+
+      <div class="mb-3 text-end">
+        <a href="/graph" class="btn btn-outline-success">📊 グラフ表示ページへ</a>
+      </div>
+
       <form id="reportForm">
         <div class="mb-3">
           <label for="date" class="form-label">日付</label>
           <input type="date" class="form-control" id="date" name="date" required>
         </div>
+
         <div class="mb-3">
           <label for="name" class="form-label">氏名</label>
-          <input type="text" class="form-control" id="name" name="name" value="{{ session['name'] }}" readonly>
+          <select class="form-select" id="name" name="name" required>
+            <option value="">選択してください</option>
+            {% for n in names %}<option value="{{n}}">{{n}}</option>{% endfor %}
+          </select>
         </div>
 
         <div class="row fw-bold">
@@ -78,13 +87,8 @@
 <script>
 const categoryMap = {{ category_map | tojson }};
 const mustResetPassword = {{ must_reset_password | tojson }};
-if (mustResetPassword === true) window.location.href = "/reset_password";
-
-function isInitialTask(task) {
-  return task.category === "営業" &&
-         task.detail === "企業リスト収集" &&
-         parseFloat(task.hours) === 0.00 &&
-         task.comment.trim() === "";
+if (mustResetPassword === true) {
+  window.location.href = "/reset_password";
 }
 
 function updateDetailOptions(row) {
@@ -102,14 +106,8 @@ function updateDetailOptions(row) {
 function updateTotalHours() {
   let total = 0;
   document.querySelectorAll(".task-row").forEach(row => {
-    const task = {
-      category: row.querySelector("select[name='category']").value,
-      detail: row.querySelector("select[name='detail']").value,
-      hours: row.querySelector("select[name='hours']").value,
-      comment: row.querySelector("input[name='comment']").value
-    };
-    const val = parseFloat(task.hours);
-    if (!isInitialTask(task) && !isNaN(val)) total += val;
+    const hours = parseFloat(row.querySelector("select[name='hours']").value);
+    if (!isNaN(hours) && hours > 0) total += hours;
   });
   document.getElementById("dailyHours").textContent = total.toFixed(2);
 }
@@ -135,24 +133,57 @@ function createTaskRow(task = null) {
     category.selectedIndex = 0;
     updateDetailOptions(newRow);
     detail.selectedIndex = 0;
-    const zeroOption = [...hours.options].find(opt => opt.value === "0.00");
-    if (zeroOption) hours.value = "0.00";
+    hours.value = "0.00";
     comment.value = "";
   }
 
   category.addEventListener("change", () => updateDetailOptions(newRow));
   hours.addEventListener("change", updateTotalHours);
   newRow.querySelector(".remove-task").addEventListener("click", () => {
-    newRow.remove(); updateTotalHours();
+    newRow.remove();
+    updateTotalHours();
   });
 
   return newRow;
 }
 
+window.addEventListener("DOMContentLoaded", () => {
+  const today = new Date().toISOString().split("T")[0];
+  document.getElementById("date").value = today;
+  document.getElementById("task-rows").appendChild(createTaskRow());
+});
+
 document.getElementById("addRow").addEventListener("click", () => {
   const row = createTaskRow();
   document.getElementById("task-rows").appendChild(row);
-  updateTotalHours();
+});
+
+document.getElementById("reportForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const date = document.getElementById("date").value;
+  const name = document.getElementById("name").value;
+  const taskRows = document.querySelectorAll(".task-row");
+  const tasks = Array.from(taskRows).map(row => ({
+    category: row.querySelector("select[name='category']").value,
+    detail: row.querySelector("select[name='detail']").value,
+    hours: row.querySelector("select[name='hours']").value,
+    comment: row.querySelector("input[name='comment']").value
+  }));
+
+  const res = await fetch("/submit", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({date, name, tasks})
+  });
+  const result = await res.json();
+  alert(res.ok ? result.message : "送信失敗: " + result.message);
+});
+
+document.getElementById("previewButton").addEventListener("click", () => {
+  const date = document.getElementById("date").value;
+  const name = document.getElementById("name").value;
+  if (!date || !name) return alert("日付と氏名を選択してください");
+  window.open(`/preview?date=${date}&name=${name}`, "_blank");
 });
 
 document.getElementById("saveDraft").addEventListener("click", async () => {
@@ -163,7 +194,7 @@ document.getElementById("saveDraft").addEventListener("click", async () => {
     detail: row.querySelector("select[name='detail']").value,
     hours: row.querySelector("select[name='hours']").value,
     comment: row.querySelector("input[name='comment']").value
-  })).filter(task => !isInitialTask(task));
+  }));
 
   const res = await fetch("/save_draft", {
     method: "POST",
@@ -190,37 +221,6 @@ document.getElementById("loadDraft").addEventListener("click", async () => {
   alert("下書きを読み込みました");
 });
 
-document.getElementById("reportForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const date = document.getElementById("date").value;
-  const name = document.getElementById("name").value;
-  const taskRows = document.querySelectorAll(".task-row");
-  const tasks = Array.from(taskRows).map(row => ({
-    category: row.querySelector("select[name='category']").value,
-    detail: row.querySelector("select[name='detail']").value,
-    hours: row.querySelector("select[name='hours']").value,
-    comment: row.querySelector("input[name='comment']").value
-  })).filter(task => !isInitialTask(task));
-
-  const res = await fetch("/submit", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({date, name, tasks})
-  });
-  const result = await res.json();
-  alert(res.ok ? result.message : "送信失敗: " + result.message);
-});
-
-document.getElementById("previewButton").addEventListener("click", () => {
-  const date = document.getElementById("date").value;
-  const name = document.getElementById("name").value;
-  if (!date || !name) {
-    alert("日付と氏名を選択してください");
-    return;
-  }
-  window.open(`/preview?date=${date}&name=${name}`, "_blank");
-});
-
 document.getElementById("date").addEventListener("change", async () => {
   const date = document.getElementById("date").value;
   const name = document.getElementById("name").value;
@@ -230,11 +230,8 @@ document.getElementById("date").addEventListener("change", async () => {
   document.getElementById("monthlyHours").textContent = result.monthly_hours?.toFixed(2) + " 時間";
 });
 
-window.addEventListener("DOMContentLoaded", () => {
-  const today = new Date().toISOString().split("T")[0];
-  document.getElementById("date").value = today;
-  document.getElementById("task-rows").appendChild(createTaskRow());
-  updateTotalHours();
+document.getElementById("name").addEventListener("change", () => {
+  document.getElementById("date").dispatchEvent(new Event("change"));
 });
 </script>
 </body>
